@@ -19,31 +19,9 @@ using namespace rapidjson;
 #define JSON_PROT_OBJ_REF "objref"
 #define JSON_PROT_CDC "cdc"
 
-TASE2Config::TASE2Config ()
-{
-    m_exchangeConfigComplete = false;
-    m_protocolConfigComplete = false;
-}
+TASE2Config::TASE2Config () = default;
 
-void
-TASE2Config::deleteExchangeDefinitions ()
-{
-    if (m_exchangeDefinitions == nullptr)
-        return;
-
-    delete m_exchangeDefinitions;
-
-    m_exchangeDefinitions = nullptr;
-
-    if (m_exchangeDefinitionsObjRef == nullptr)
-        return;
-
-    delete m_exchangeDefinitionsObjRef;
-
-    m_exchangeDefinitionsObjRef = nullptr;
-}
-
-TASE2Config::~TASE2Config () { deleteExchangeDefinitions (); }
+TASE2Config::~TASE2Config () = default;
 
 bool
 TASE2Config::isValidIPAddress (const std::string& addrStr)
@@ -88,14 +66,15 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
         return;
     }
 
-    const Value& vcc = modelConf["vcc"];
+    const Value& vccValue = modelConf["vcc"];
 
-    if (!vcc.HasMember ("datapoints") || !vcc["datapoints"].IsArray ())
+    if (!vccValue.HasMember ("datapoints")
+        || !vccValue["datapoints"].IsArray ())
     {
         return;
     }
 
-    const Value& vccDatapoints = vcc["datapoints"];
+    const Value& vccDatapoints = vccValue["datapoints"];
     Tase2_Domain vcc = Tase2_DataModel_getVCC (model);
 
     for (const Value& datapoint : vccDatapoints.GetArray ())
@@ -114,6 +93,212 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
         {
             Tase2Utility::log_error ("DATAPOINT HAS NO TYPE");
             return;
+        }
+
+        DPTYPE type = TASE2Datapoint::getDpTypeFromString (
+            datapoint["type"].GetString ());
+
+        if (type == DP_TYPE_UNKNOWN)
+        {
+            Tase2Utility::log_error ("Invalid dp type %s",
+                                     datapoint["type"].GetString ());
+            continue;
+        }
+
+        auto t2dp = std::make_shared<TASE2Datapoint> (
+            datapoint["name"].GetString (),
+            TASE2Datapoint::getDpTypeFromString (
+                datapoint["type"].GetString ()));
+
+        m_exchangeDefinitions["vcc"].insert ({ t2dp->getLabel (), t2dp });
+
+        if (TASE2Datapoint::isCommand (t2dp->getType ()))
+        {
+            if (!datapoint.HasMember ("mode")
+                || !datapoint["mode"].IsString ())
+            {
+                Tase2Utility::log_error (
+                    "CONTROL POINT HAS NO mode attribute ");
+                continue;
+            }
+            if (!datapoint.HasMember ("hasTag")
+                || !datapoint["hasTag"].IsBool ())
+            {
+                Tase2Utility::log_error (
+                    "CONTROL POINT HAS NO hasTag attribute ");
+                continue;
+            }
+
+            if (!datapoint.HasMember ("checkBackId")
+                || !datapoint["checkBackId"].IsInt ())
+            {
+                Tase2Utility::log_error (
+                    "CONTROL POINT HAS NO checkBackId attribute ");
+                continue;
+            }
+
+            auto deviceClass = static_cast<Tase2_DeviceClass> (
+                datapoint["mode"].GetString () == "sbo");
+
+            bool hasTag = datapoint["hasTag"].GetBool ();
+
+            auto checkBackId = (int16_t)datapoint["checkBackId"].GetInt ();
+
+            Tase2_ControlPointType contType
+                = TASE2Datapoint::toControlPointType (t2dp->getType ());
+
+            t2dp->setControlPoint (Tase2_Domain_addControlPoint (
+                vcc, t2dp->getLabel ().c_str (), contType, deviceClass, hasTag,
+                checkBackId));
+        }
+        else
+        {
+            if (!datapoint.HasMember ("hasCOV")
+                || !datapoint["hasCOV"].IsBool ())
+            {
+                Tase2Utility::log_error (
+                    "INDICATION POINT HAS NO hasCOV attribute ");
+                return;
+            }
+
+            bool hasCOV = datapoint["hasCOV"].GetBool ();
+            Tase2_QualityClass qClass
+                = TASE2Datapoint::getQualityClass (t2dp->getType ());
+            Tase2_TimeStampClass tsClass
+                = TASE2Datapoint::getTimeStampClass (t2dp->getType ());
+            Tase2_IndicationPointType indType
+                = TASE2Datapoint::toIndicationPointType (t2dp->getType ());
+            t2dp->setIndicationPoint (Tase2_Domain_addIndicationPoint (
+                vcc, t2dp->getLabel ().c_str (), indType, qClass, tsClass,
+                hasCOV, true));
+        }
+    }
+
+    if (!modelConf.HasMember ("icc") || !modelConf["icc"].IsArray ())
+    {
+        return;
+    }
+
+    const Value& iccArray = modelConf["icc"];
+
+    for (const Value& iccValue : iccArray.GetArray ())
+    {
+        if (!iccValue.HasMember ("name") || !iccValue["name"].IsString ())
+        {
+            return;
+        }
+
+        Tase2_Domain icc
+            = Tase2_DataModel_addDomain (model, iccValue["name"].GetString ());
+
+        m_domains[iccValue["name"].GetString ()] = icc;
+
+        if (!iccValue.HasMember ("datapoints")
+            || !iccValue["datapoints"].IsArray ())
+        {
+            return;
+        }
+
+        const Value& iccDatapoints = iccValue["datapoints"];
+
+        for (const Value& datapoint : iccDatapoints.GetArray ())
+        {
+            if (!datapoint.IsObject ())
+            {
+                Tase2Utility::log_error ("DATAPOINT NOT AN OBJECT");
+                return;
+            }
+            if (!datapoint.HasMember ("name")
+                || !datapoint["name"].IsString ())
+            {
+                Tase2Utility::log_error ("DATAPOINT HAS NO NAME");
+                return;
+            }
+            if (!datapoint.HasMember ("type")
+                || !datapoint["type"].IsString ())
+            {
+                Tase2Utility::log_error ("DATAPOINT HAS NO TYPE");
+                return;
+            }
+
+            DPTYPE type = TASE2Datapoint::getDpTypeFromString (
+                datapoint["type"].GetString ());
+
+            if (type == DP_TYPE_UNKNOWN)
+            {
+                Tase2Utility::log_error ("Invalid dp type %s",
+                                         datapoint["type"].GetString ());
+                continue;
+            }
+
+            auto t2dp = std::make_shared<TASE2Datapoint> (
+                datapoint["name"].GetString (),
+                TASE2Datapoint::getDpTypeFromString (
+                    datapoint["type"].GetString ()));
+
+            m_exchangeDefinitions[iccValue["name"].GetString ()].insert (
+                { t2dp->getLabel (), t2dp });
+
+            if (TASE2Datapoint::isCommand (t2dp->getType ()))
+            {
+                if (!datapoint.HasMember ("mode")
+                    || !datapoint["mode"].IsString ())
+                {
+                    Tase2Utility::log_error (
+                        "CONTROL POINT HAS NO mode attribute ");
+                    continue;
+                }
+                if (!datapoint.HasMember ("hasTag")
+                    || !datapoint["hasTag"].IsBool ())
+                {
+                    Tase2Utility::log_error (
+                        "CONTROL POINT HAS NO hasTag attribute ");
+                    continue;
+                }
+
+                if (!datapoint.HasMember ("checkBackId")
+                    || !datapoint["checkBackId"].IsInt ())
+                {
+                    Tase2Utility::log_error (
+                        "CONTROL POINT HAS NO checkBackId attribute ");
+                    continue;
+                }
+
+                auto deviceClass = static_cast<Tase2_DeviceClass> (
+                    datapoint["mode"].GetString () == "sbo");
+
+                bool hasTag = datapoint["hasTag"].GetBool ();
+
+                auto checkBackId = (int16_t)datapoint["checkBackId"].GetInt ();
+
+                Tase2_ControlPointType contType
+                    = TASE2Datapoint::toControlPointType (t2dp->getType ());
+
+                t2dp->setControlPoint (Tase2_Domain_addControlPoint (
+                    icc, t2dp->getLabel ().c_str (), contType, deviceClass,
+                    hasTag, checkBackId));
+            }
+            else
+            {
+                if (!datapoint.HasMember ("hasCOV")
+                    || !datapoint["hasCOV"].IsBool ())
+                {
+                    Tase2Utility::log_error (
+                        "INDICATION POINT HAS NO hasCOV attribute ");
+                    return;
+                }
+
+                bool hasCOV = datapoint["hasCOV"].GetBool ();
+                Tase2_QualityClass qClass
+                    = TASE2Datapoint::getQualityClass (t2dp->getType ());
+                Tase2_TimeStampClass tsClass
+                    = TASE2Datapoint::getTimeStampClass (t2dp->getType ());
+                Tase2_IndicationPointType indType
+                    = TASE2Datapoint::toIndicationPointType (t2dp->getType ());
+                t2dp->setIndicationPoint (Tase2_Domain_addIndicationPoint (
+                    icc, t2dp->getLabel ().c_str (), indType, qClass, tsClass,
+                    hasCOV, true));
+            }
         }
     }
 }

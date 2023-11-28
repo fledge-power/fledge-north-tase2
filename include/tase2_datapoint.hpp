@@ -13,14 +13,14 @@
 
 typedef enum
 {
-    STATE,
-    STATEQ,
-    STATEQTIME,
-    STATEQTIMEEXT,
     REAL,
     REALQ,
     REALQTIME,
     REALQTIMEEXT,
+    STATE,
+    STATEQ,
+    STATEQTIME,
+    STATEQTIMEEXT,
     DISCRETE,
     DISCRETEQ,
     DISCRETEQTIME,
@@ -31,31 +31,69 @@ typedef enum
     STATESUPQTIMEEXT,
     COMMAND,
     SETPOINTREAL,
-    SETPOINTDISCRETE
+    SETPOINTDISCRETE,
+    DP_TYPE_UNKNOWN = -1
 } DPTYPE;
 
 class TASE2Datapoint
 {
   public:
-    TASE2Datapoint (const std::string& label, const std::string& objref,
-                    DPTYPE type);
+    TASE2Datapoint (const std::string& label, DPTYPE type);
     ~TASE2Datapoint ();
 
-    static int getDpTypeFromString (const std::string& type);
+    static DPTYPE getDpTypeFromString (const std::string& type);
+
+    static Tase2_IndicationPointType
+    toIndicationPointType (DPTYPE type)
+    {
+        return static_cast<Tase2_IndicationPointType> (type / 4);
+    };
+
+    static Tase2_ControlPointType
+    toControlPointType (DPTYPE type)
+    {
+        return static_cast<Tase2_ControlPointType> (type % 4);
+    };
+
+    static Tase2_QualityClass
+    getQualityClass (DPTYPE type)
+    {
+        return static_cast<Tase2_QualityClass> (type % 4 > 0);
+    };
+
+    static Tase2_TimeStampClass
+    getTimeStampClass (DPTYPE type)
+    {
+        return static_cast<Tase2_TimeStampClass> (type % 4 < 2 ? 0
+                                                               : type % 4 - 2);
+    };
 
     DPTYPE
     getType () { return m_type; };
 
     const std::string
-    getObjRef ()
-    {
-        return m_objref;
-    };
-    const std::string
     getLabel ()
     {
         return m_label;
     };
+
+    static bool
+    isCommand (DPTYPE type)
+    {
+        return type != DP_TYPE_UNKNOWN && type >= COMMAND;
+    }
+
+    void
+    setControlPoint (Tase2_ControlPoint cont)
+    {
+        m_dp.ControlPoint = cont;
+    };
+
+    void
+    setIndicationPoint (Tase2_IndicationPoint ind)
+    {
+        m_dp.IndPoint = ind;
+    }
 
     const Tase2_QualityClass
     getQuality ()
@@ -88,7 +126,6 @@ class TASE2Datapoint
 
   private:
     std::string m_label;
-    std::string m_objref;
 
     bool isTransient;
 
@@ -96,6 +133,14 @@ class TASE2Datapoint
     float m_floatVal;
 
     bool m_hasIntVal;
+
+    using dp = union
+    {
+        Tase2_IndicationPoint IndPoint;
+        Tase2_ControlPoint ControlPoint;
+    };
+
+    dp m_dp;
 
     Tase2_QualityClass m_quality;
     Tase2_TimeStampClass m_timestamp;

@@ -7,9 +7,9 @@
 #include "tase2_datapoint.hpp"
 
 #include <algorithm>
-#include <map>
 #include <regex>
 #include <sstream>
+#include <unordered_map>
 #include <vector>
 
 #include <libtase2/tase2_server.h>
@@ -43,7 +43,9 @@ class TASE2Config
         return m_useTLS;
     };
 
-    std::map<std::string, std::shared_ptr<TASE2Datapoint> >*
+    std::unordered_map<
+        std::string,
+        std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> > >&
     getExchangeDefinitions ()
     {
         return m_exchangeDefinitions;
@@ -55,24 +57,21 @@ class TASE2Config
   private:
     static bool isValidIPAddress (const std::string& addrStr);
 
-    void deleteExchangeDefinitions ();
-
     std::string m_ip = "";
     int m_tcpPort = -1;
 
     bool m_useTLS = false;
 
     bool m_bindOnIp;
-    bool m_protocolConfigComplete;
-    bool m_exchangeConfigComplete;
+    bool m_protocolConfigComplete = false;
+    bool m_exchangeConfigComplete = false;
 
-    std::map<std::string, std::shared_ptr<TASE2Datapoint> >*
-        m_exchangeDefinitions
-        = nullptr;
-    std::map<std::string, std::shared_ptr<TASE2Datapoint> >*
-        m_exchangeDefinitionsObjRef
-        = nullptr;
+    std::unordered_map<
+        std::string,
+        std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> > >
+        m_exchangeDefinitions;
 
+    std::unordered_map<std::string, Tase2_Domain> m_domains;
     std::string m_privateKey;
     std::string m_ownCertificate;
     std::vector<std::string> m_remoteCertificates;

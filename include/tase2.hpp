@@ -104,9 +104,8 @@ class TASE2Server
     std::string m_name;
     TASE2Config* m_config = nullptr;
 
-    std::map<std::string, std::shared_ptr<TASE2Datapoint> >*
-        m_exchangeDefinitions
-        = nullptr;
+    std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> >
+        m_exchangeDefinitions;
 
     int (*m_oper) (char* operation, int paramCount, char* names[],
                    char* parameters[], ControlDestination destination, ...)
