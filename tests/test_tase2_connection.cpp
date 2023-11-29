@@ -31,24 +31,37 @@ static string tls = QUOTE ({
 });
 
 static string model_config = QUOTE ({
-    "model" : {
+    "model_conf" : {
         "vcc" : {
             "datapoints" : [
-                { "name" : "datapoint1", "type" : "STATEQTIME" },
-                { "name" : "datapoint2", "type" : "STATEQTIMEEXTENDED" }
+                {
+                    "name" : "datapoint1",
+                    "type" : "StateQTime",
+                    "hasCOV" : false
+                },
+                {
+                    "name" : "datapoint2",
+                    "type" : "StateQTimeExt",
+                    "hasCOV" : false
+                }
             ]
         },
         "icc" : [
             {
                 "name" : "ICC1",
-                "datapoints" :
-                    [ { "name" : "datapoint1", "type" : "STATEQTIME" } ]
+                "datapoints" : [ {
+                    "name" : "datapoint1",
+                    "type" : "StateQTime",
+                    "hasCOV" : false
+                } ]
             },
             {
                 "name" : "ICC2",
-                "datapoints" : [
-                    { "name" : "datapoint2", "type" : "STATEQTIMEEXTENDED" }
-                ]
+                "datapoints" : [ {
+                    "name" : "datapoint2",
+                    "type" : "StateQTimeExt",
+                    "hasCOV" : false
+                } ]
             }
         ],
         "bilateral_tables" : [
@@ -57,8 +70,7 @@ static string model_config = QUOTE ({
                 "icc" : "ICC1",
                 "apTitle" : "1.1.1.998",
                 "aeQualifier" : 12,
-                "datapoints" :
-                    [ { "name" : "datapoint1", "type" : "STATEQTIME" } ]
+                "datapoints" : [ { "name" : "datapoint1" } ]
             },
             {
                 "name" : "BLT_MZA_002_V1",
@@ -189,15 +201,21 @@ TEST_F (ConnectionHandlerTest, NormalConnection)
     tase2Server->setJsonConfig (protocol_stack, exchanged_data, "",
                                 model_config);
 
+    tase2Server->start ();
+
     Thread_sleep (500); /* wait for the server to start */
 
     Tase2_Client client = Tase2_Client_create (nullptr);
 
+    Tase2_Client_setLocalApTitle (client, "1.1.1.998", 12);
+    Tase2_Client_setRemoteApTitle (client, "1.1.1.999", 12);
+
     Tase2_Client_setTcpPort (client, TCP_TEST_PORT);
 
-    Tase2_ClientError err = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+    Tase2_ClientError err
+        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
 
     ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
 
-    Tase2_Endpoint_destroy (endpoint);
+    Tase2_Client_destroy (client);
 }

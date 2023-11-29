@@ -16,7 +16,7 @@ using namespace rapidjson;
 
 #define PROTOCOL_TASE2 "tase2"
 #define JSON_PROT_NAME "name"
-#define JSON_PROT_OBJ_REF "objref"
+#define JSON_PROT_REF "ref"
 #define JSON_PROT_CDC "cdc"
 
 TASE2Config::TASE2Config () = default;
@@ -50,12 +50,15 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
 
     if (!document.IsObject ())
     {
+        Tase2Utility::log_error ("Model configuration is not an object");
         return;
     }
 
     if (!document.HasMember ("model_conf")
         || !document["model_conf"].IsObject ())
     {
+        Tase2Utility::log_error (
+            "Missing or invalid 'model_conf' object in model configuration");
         return;
     }
 
@@ -63,6 +66,8 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
 
     if (!modelConf.HasMember ("vcc") || !modelConf["vcc"].IsObject ())
     {
+        Tase2Utility::log_error (
+            "Missing or invalid 'vcc' object in 'model_conf'");
         return;
     }
 
@@ -71,6 +76,8 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
     if (!vccValue.HasMember ("datapoints")
         || !vccValue["datapoints"].IsArray ())
     {
+        Tase2Utility::log_error (
+            "Missing or invalid 'datapoints' array in 'vcc'");
         return;
     }
 
@@ -110,7 +117,7 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
             TASE2Datapoint::getDpTypeFromString (
                 datapoint["type"].GetString ()));
 
-        m_exchangeDefinitions["vcc"].insert ({ t2dp->getLabel (), t2dp });
+        m_modelEntries["vcc"].insert ({ t2dp->getLabel (), t2dp });
 
         if (TASE2Datapoint::isCommand (t2dp->getType ()))
         {
@@ -176,6 +183,8 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
 
     if (!modelConf.HasMember ("icc") || !modelConf["icc"].IsArray ())
     {
+        Tase2Utility::log_error (
+            "Missing or invalid 'icc' array in 'model_conf'");
         return;
     }
 
@@ -185,6 +194,7 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
     {
         if (!iccValue.HasMember ("name") || !iccValue["name"].IsString ())
         {
+            Tase2Utility::log_error ("ICC MISSING NAME");
             return;
         }
 
@@ -196,6 +206,7 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
         if (!iccValue.HasMember ("datapoints")
             || !iccValue["datapoints"].IsArray ())
         {
+            Tase2Utility::log_error ("ICC MISSING DATAPOINTS");
             return;
         }
 
@@ -236,7 +247,7 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                 TASE2Datapoint::getDpTypeFromString (
                     datapoint["type"].GetString ()));
 
-            m_exchangeDefinitions[iccValue["name"].GetString ()].insert (
+            m_modelEntries[iccValue["name"].GetString ()].insert (
                 { t2dp->getLabel (), t2dp });
 
             if (TASE2Datapoint::isCommand (t2dp->getType ()))
@@ -299,6 +310,121 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                     icc, t2dp->getLabel ().c_str (), indType, qClass, tsClass,
                     hasCOV, true));
             }
+        }
+    }
+
+    if (!modelConf.HasMember ("bilateral_tables")
+        || !modelConf["bilateral_tables"].IsArray ())
+    {
+        Tase2Utility::log_error (
+            "Missing or invalid 'bilateral_tables' array in 'model_conf'");
+        return;
+    }
+
+    const Value& bltArray = modelConf["bilateral_tables"];
+
+    for (const Value& bltValue : bltArray.GetArray ())
+    {
+        if (!bltValue.HasMember ("name") || !bltValue["name"].IsString ())
+        {
+            Tase2Utility::log_error ("BILATERAL TABLE MISSING NAME");
+            return;
+        }
+
+        if (!bltValue.HasMember ("icc") || !bltValue["icc"].IsString ())
+        {
+            Tase2Utility::log_error ("BILATERAL TABLE MISSING 'icc'");
+            return;
+        }
+
+        if (!bltValue.HasMember ("apTitle")
+            || !bltValue["apTitle"].IsString ())
+        {
+            Tase2Utility::log_error ("BILATERAL TABLE MISSING 'apTitle'");
+            return;
+        }
+
+        if (!bltValue.HasMember ("aeQualifier")
+            || !bltValue["aeQualifier"].IsInt ())
+        {
+            Tase2Utility::log_error ("BILATERAL TABLE MISSING 'aeQualifier'");
+            return;
+        }
+
+        if (!bltValue.HasMember ("datapoints")
+            || !bltValue["datapoints"].IsArray ())
+        {
+            Tase2Utility::log_error ("BILATERAL TABLE MISSING 'datapoints'");
+            return;
+        }
+
+        auto it = m_domains.find (bltValue["icc"].GetString ());
+
+        if (it == m_domains.end ())
+        {
+            Tase2Utility::log_error ("ICC not found for bilateral table");
+            return;
+        }
+
+        Tase2_Domain icc = it->second;
+
+        Tase2_BilateralTable blt
+            = Tase2_BilateralTable_create (bltValue["name"].GetString (), icc,
+                                           bltValue["apTitle"].GetString (),
+                                           bltValue["aeQualifier"].GetInt ());
+
+        const Value& bltDatapoints = bltValue["datapoints"];
+
+        int n = 1234;
+
+        for (const Value& datapoint : bltDatapoints.GetArray ())
+        {
+            if (!datapoint.IsObject ())
+            {
+                Tase2Utility::log_error ("DATAPOINT NOT AN OBJECT");
+                continue;
+            }
+            if (!datapoint.HasMember ("name")
+                || !datapoint["name"].IsString ())
+            {
+                Tase2Utility::log_error ("DATAPOINT HAS NO NAME");
+                continue;
+            }
+
+            auto it1 = m_modelEntries[bltValue["icc"].GetString ()].find (
+                datapoint["name"].GetString ());
+
+            if (it1 == m_modelEntries[bltValue["icc"].GetString ()].end ())
+            {
+                Tase2Utility::log_debug ("Data point '%s' not found in "
+                                         "exchange definitions for ICC '%s'",
+                                         datapoint["name"].GetString (),
+                                         bltValue["icc"].GetString ());
+                continue;
+            }
+
+            std::shared_ptr<TASE2Datapoint> t2dp = it1->second;
+
+            if (TASE2Datapoint::isCommand (t2dp->getType ()))
+            {
+                Tase2_BilateralTable_addControlPoint (
+                    blt, t2dp->getControlPoint (), n++, true, true, true,
+                    true);
+                Tase2Utility::log_debug (
+                    "Added Control Point '%s' to Bilateral Table '%s'",
+                    t2dp->getLabel ().c_str (), bltValue["name"].GetString ());
+            }
+            else
+            {
+                Tase2_BilateralTable_addDataPoint (
+                    blt, (Tase2_DataPoint)t2dp->getIndicationPoint (), true,
+                    false);
+                Tase2Utility::log_debug (
+                    "Added Data Point '%s' to Bilateral Table '%s'",
+                    t2dp->getLabel ().c_str (), bltValue["name"].GetString ());
+            }
+
+            m_bilateral_tables.push_back (blt);
         }
     }
 }
@@ -405,7 +531,106 @@ void
 TASE2Config::importExchangeConfig (const std::string& exchangeConfig,
                                    Tase2_DataModel model)
 {
-    return;
+    m_exchangeConfigComplete = false;
+
+    m_modelEntries.clear ();
+
+    Document document;
+
+    if (document.Parse (const_cast<char*> (exchangeConfig.c_str ()))
+            .HasParseError ())
+    {
+        Logger::getLogger ()->fatal (
+            "Parsing error in data exchange configuration");
+
+        return;
+    }
+
+    if (!document.IsObject ())
+        return;
+
+    if (!document.HasMember (JSON_EXCHANGED_DATA)
+        || !document[JSON_EXCHANGED_DATA].IsObject ())
+    {
+        return;
+    }
+
+    const Value& exchangeData = document[JSON_EXCHANGED_DATA];
+
+    if (!exchangeData.HasMember (JSON_DATAPOINTS)
+        || !exchangeData[JSON_DATAPOINTS].IsArray ())
+    {
+        return;
+    }
+
+    const Value& datapoints = exchangeData[JSON_DATAPOINTS];
+
+    for (const Value& datapoint : datapoints.GetArray ())
+    {
+
+        if (!datapoint.IsObject ())
+            return;
+
+        if (!datapoint.HasMember (JSON_LABEL)
+            || !datapoint[JSON_LABEL].IsString ())
+            return;
+
+        std::string label = datapoint[JSON_LABEL].GetString ();
+
+        if (!datapoint.HasMember (JSON_PROTOCOLS)
+            || !datapoint[JSON_PROTOCOLS].IsArray ())
+            return;
+
+        for (const Value& protocol : datapoint[JSON_PROTOCOLS].GetArray ())
+        {
+
+            if (!protocol.HasMember (JSON_PROT_NAME)
+                || !protocol[JSON_PROT_NAME].IsString ())
+                return;
+
+            std::string protocolName = protocol[JSON_PROT_NAME].GetString ();
+
+            if (!protocol.HasMember (JSON_PROT_REF)
+                || !protocol[JSON_PROT_REF].IsString ())
+                return;
+
+            std::string protocolRef = protocol[JSON_PROT_REF].GetString ();
+
+            size_t colonPos = protocolRef.find (':');
+
+            if (colonPos != std::string::npos)
+            {
+                std::string domainRef = protocolRef.substr (0, colonPos);
+                std::string dpRef = protocolRef.substr (colonPos + 1);
+
+                auto itD = m_modelEntries.find (domainRef);
+                if (itD == m_modelEntries.end ())
+                {
+                    Tase2Utility::log_warn ("Invalid Domain %s",
+                                            domainRef.c_str ());
+                    continue;
+                }
+
+                std::unordered_map<std::string,
+                                   std::shared_ptr<TASE2Datapoint> >
+                    domain = itD->second;
+
+                auto itDP = domain.find (dpRef);
+                if (itDP == domain.end ())
+                {
+                    Tase2Utility::log_warn ("Invalid Datapoint ref %s",
+                                            dpRef.c_str ());
+                    continue;
+                }
+            }
+            else
+            {
+                Tase2Utility::log_warn ("Invalid ref %s",
+                                        protocolRef.c_str ());
+                continue;
+            }
+        }
+    }
 }
 
 void

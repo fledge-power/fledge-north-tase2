@@ -46,9 +46,15 @@ class TASE2Config
     std::unordered_map<
         std::string,
         std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> > >&
-    getExchangeDefinitions ()
+    getModelEntries ()
     {
-        return m_exchangeDefinitions;
+        return m_modelEntries;
+    };
+
+    std::vector<Tase2_BilateralTable>&
+    getBilateralTables ()
+    {
+        return m_bilateral_tables;
     };
 
     std::shared_ptr<TASE2Datapoint>
@@ -69,8 +75,9 @@ class TASE2Config
     std::unordered_map<
         std::string,
         std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> > >
-        m_exchangeDefinitions;
+        m_modelEntries;
 
+    std::vector<Tase2_BilateralTable> m_bilateral_tables;
     std::unordered_map<std::string, Tase2_Domain> m_domains;
     std::string m_privateKey;
     std::string m_ownCertificate;

@@ -60,6 +60,8 @@ class TASE2Server
                         const std::string& tlsConfig,
                         const std::string& modelConfig);
 
+    void start ();
+
     void
     setModelPath (const std::string& path)
     {
@@ -105,7 +107,7 @@ class TASE2Server
     TASE2Config* m_config = nullptr;
 
     std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> >
-        m_exchangeDefinitions;
+        m_modelEntries;
 
     int (*m_oper) (char* operation, int paramCount, char* names[],
                    char* parameters[], ControlDestination destination, ...)

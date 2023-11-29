@@ -83,6 +83,18 @@ class TASE2Datapoint
         return type != DP_TYPE_UNKNOWN && type >= COMMAND;
     }
 
+    Tase2_ControlPoint
+    getControlPoint ()
+    {
+        return m_dp.ControlPoint;
+    }
+
+    Tase2_IndicationPoint
+    getIndicationPoint ()
+    {
+        return m_dp.IndPoint;
+    }
+
     void
     setControlPoint (Tase2_ControlPoint cont)
     {
