@@ -45,7 +45,7 @@ class TASE2Config
 
     std::unordered_map<
         std::string,
-        std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> > >&
+        std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> > >
     getModelEntries ()
     {
         return m_modelEntries;
@@ -58,7 +58,7 @@ class TASE2Config
     };
 
     std::shared_ptr<TASE2Datapoint>
-    getDatapointByObjectReference (const std::string& objRef);
+    getDatapointByReference (const std::string& ref, const std::string& name);
 
   private:
     static bool isValidIPAddress (const std::string& addrStr);

@@ -247,9 +247,6 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                 TASE2Datapoint::getDpTypeFromString (
                     datapoint["type"].GetString ()));
 
-            m_modelEntries[iccValue["name"].GetString ()].insert (
-                { t2dp->getLabel (), t2dp });
-
             if (TASE2Datapoint::isCommand (t2dp->getType ()))
             {
                 if (!datapoint.HasMember ("mode")
@@ -310,6 +307,14 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                     icc, t2dp->getLabel ().c_str (), indType, qClass, tsClass,
                     hasCOV, true));
             }
+
+            m_modelEntries[iccValue["name"].GetString ()][t2dp->getLabel ()]
+                = t2dp;
+
+            Tase2Utility::log_debug (
+                "Add datapoint %s to domain %s, %d datapoints present",
+                t2dp->getLabel ().c_str (), iccValue["name"].GetString (),
+                m_modelEntries.size ());
         }
     }
 
@@ -423,9 +428,8 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                     "Added Data Point '%s' to Bilateral Table '%s'",
                     t2dp->getLabel ().c_str (), bltValue["name"].GetString ());
             }
-
-            m_bilateral_tables.push_back (blt);
         }
+        m_bilateral_tables.push_back (blt);
     }
 }
 
@@ -532,8 +536,6 @@ TASE2Config::importExchangeConfig (const std::string& exchangeConfig,
                                    Tase2_DataModel model)
 {
     m_exchangeConfigComplete = false;
-
-    m_modelEntries.clear ();
 
     Document document;
 
@@ -663,4 +665,25 @@ TASE2Config::ServerIp ()
     {
         return m_ip;
     }
+}
+
+std::shared_ptr<TASE2Datapoint>
+TASE2Config::getDatapointByReference (const std::string& domainRef,
+                                      const std::string& name)
+{
+    auto itDomain = m_modelEntries.find (domainRef);
+    if (itDomain == m_modelEntries.end ())
+    {
+        return nullptr;
+    }
+
+    auto domain = itDomain->second;
+    auto itDp = domain.find (name);
+
+    if (itDp == domain.end ())
+    {
+        return nullptr;
+    }
+
+    return itDp->second;
 }
