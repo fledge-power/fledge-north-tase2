@@ -65,6 +65,7 @@ static const char* default_config = QUOTE ({
         "order" : "3",
         "default" : QUOTE ({
             "model_conf" : {
+
                 "vcc" : {
                     "datapoints" : [
                         {
@@ -75,6 +76,86 @@ static const char* default_config = QUOTE ({
                         {
                             "name" : "datapoint2",
                             "type" : "DiscreteQTimeExt",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointReal",
+                            "type" : "Real",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointRealQ",
+                            "type" : "RealQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointRealQTime",
+                            "type" : "RealQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointRealQTimeExt",
+                            "type" : "RealQTimeExt",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointState",
+                            "type" : "State",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateQ",
+                            "type" : "StateQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateQTime",
+                            "type" : "StateQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateQTimeExt",
+                            "type" : "StateQTimeExt",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscrete",
+                            "type" : "Discrete",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscreteQ",
+                            "type" : "DiscreteQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscreteQTime",
+                            "type" : "DiscreteQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscreteQTimeExt",
+                            "type" : "DiscreteQTimeExt",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSup",
+                            "type" : "StateSup",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSupQ",
+                            "type" : "StateSupQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSupQTime",
+                            "type" : "StateSupQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSupQTimeExt",
+                            "type" : "StateSupQTimeExt",
                             "hasCOV" : false
                         }
                     ]
@@ -91,6 +172,86 @@ static const char* default_config = QUOTE ({
                             "name" : "datapoint2",
                             "type" : "DiscreteQTimeExt",
                             "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointReal",
+                            "type" : "Real",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointRealQ",
+                            "type" : "RealQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointRealQTime",
+                            "type" : "RealQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointRealQTimeExt",
+                            "type" : "RealQTimeExt",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointState",
+                            "type" : "State",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateQ",
+                            "type" : "StateQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateQTime",
+                            "type" : "StateQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateQTimeExt",
+                            "type" : "StateQTimeExt",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscrete",
+                            "type" : "Discrete",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscreteQ",
+                            "type" : "DiscreteQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscreteQTime",
+                            "type" : "DiscreteQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointDiscreteQTimeExt",
+                            "type" : "DiscreteQTimeExt",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSup",
+                            "type" : "StateSup",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSupQ",
+                            "type" : "StateSupQ",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSupQTime",
+                            "type" : "StateSupQTime",
+                            "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointStateSupQTimeExt",
+                            "type" : "StateSupQTimeExt",
+                            "hasCOV" : false
                         }
                     ]
                 } ],
@@ -100,7 +261,10 @@ static const char* default_config = QUOTE ({
                         "icc" : "icc1",
                         "apTitle" : "1.1.1.998",
                         "aeQualifier" : 12,
-                        "datapoints" : [ { "name" : "datapoint1" } ]
+                        "datapoints" : [
+                            { "name" : "datapoint1" },
+                            { "name" : "datapointReal" }
+                        ]
                     },
                     {
                         "name" : "BLT_MZA_002_V1",
@@ -109,11 +273,28 @@ static const char* default_config = QUOTE ({
                         "aeQualifier" : 12,
                         "datapoints" : [
                             { "name" : "datapoint1" },
-                            { "name" : "datapoint2" }
+                            { "name" : "datapoint2" },
+                            { "name" : "datapointReal" },
+                            { "name" : "datapointRealQ" },
+                            { "name" : "datapointRealQTime" },
+                            { "name" : "datapointRealQTimeExt" },
+                            { "name" : "datapointState" },
+                            { "name" : "datapointStateQ" },
+                            { "name" : "datapointStateQTime" },
+                            { "name" : "datapointStateQTimeExt" },
+                            { "name" : "datapointDiscrete" },
+                            { "name" : "datapointDiscreteQ" },
+                            { "name" : "datapointDiscreteQTime" },
+                            { "name" : "datapointDiscreteQTimeExt" },
+                            { "name" : "datapointStateSup" },
+                            { "name" : "datapointStateSupQ" },
+                            { "name" : "datapointStateSupQTime" },
+                            { "name" : "datapointStateSupQTimeExt" }
                         ]
                     }
                 ]
             }
+
         })
     },
 
@@ -165,6 +346,7 @@ static const char* default_config = QUOTE ({
 class SendSpontDataTest : public testing::Test
 {
   protected:
+    PLUGIN_HANDLE handle;
     // Setup is ran for every tests, so each variable are reinitialised
     void
     SetUp () override
@@ -177,6 +359,7 @@ class SendSpontDataTest : public testing::Test
     void
     TearDown () override
     {
+        plugin_shutdown (handle);
     }
 
     /* callback handler that is called twice for each received transfer set
@@ -269,90 +452,339 @@ class SendSpontDataTest : public testing::Test
                 peer ? Tase2_Endpoint_Connection_getPeerIpAddress (peer) : "-",
                 message);
     }
-};
 
-template <class T>
-static Datapoint*
-createDatapoint (const std::string& dataname, const T value)
-{
-    DatapointValue dp_value = DatapointValue (value);
-    return new Datapoint (dataname, dp_value);
-}
-
-template <class T>
-static Datapoint*
-createDataObject (const char* type, const char* domain, const char* name,
-                  const T value, const char* iv, const char* cs,
-                  const char* nv, uint64_t ts, const char* tsv)
-{
-    auto* datapoints = new vector<Datapoint*>;
-
-    datapoints->push_back (createDatapoint ("do_type", type));
-    datapoints->push_back (createDatapoint ("do_domain", domain));
-    datapoints->push_back (createDatapoint ("do_name", name));
-    datapoints->push_back (createDatapoint ("do_value", value));
-    datapoints->push_back (createDatapoint ("do_validity", iv));
-    datapoints->push_back (createDatapoint ("do_cs", cs));
-    datapoints->push_back (createDatapoint ("do_quality_normal_value", nv));
-    if (ts)
+    template <class T>
+    static Datapoint*
+    createDatapoint (const std::string& dataname, const T value)
     {
-        datapoints->push_back (createDatapoint ("do_ts", (long)ts));
-        datapoints->push_back (createDatapoint ("do_ts_validity", tsv));
+        DatapointValue dp_value = DatapointValue (value);
+        return new Datapoint (dataname, dp_value);
     }
 
-    DatapointValue dpv (datapoints, true);
+    template <class T>
+    static Datapoint*
+    createDataObject (const char* type, const char* domain, const char* name,
+                      const T value, const char* iv, const char* cs,
+                      const char* nv, uint64_t ts, const char* tsv)
+    {
+        auto* datapoints = new vector<Datapoint*>;
 
-    Datapoint* dp = new Datapoint ("data_object", dpv);
+        datapoints->push_back (createDatapoint ("do_type", type));
+        datapoints->push_back (createDatapoint ("do_domain", domain));
+        datapoints->push_back (createDatapoint ("do_name", name));
 
-    return dp;
+        DPTYPE dpType = TASE2Datapoint::getDpTypeFromString (type);
+
+        switch (dpType)
+        {
+        case DISCRETE:
+        case DISCRETEQ:
+        case DISCRETEQTIME:
+        case DISCRETEQTIMEEXT:
+        case STATESUP:
+        case STATESUPQ:
+        case STATESUPQTIME:
+        case STATESUPQTIMEEXT:
+        case STATE:
+        case STATEQ:
+        case STATEQTIME:
+        case STATEQTIMEEXT: {
+            datapoints->push_back (
+                createDatapoint ("do_value", (int64_t)value));
+            break;
+        }
+        case REAL:
+        case REALQ:
+        case REALQTIME:
+        case REALQTIMEEXT: {
+            datapoints->push_back (
+                createDatapoint ("do_value", (double)value));
+            break;
+        }
+        default: {
+            break;
+        }
+        }
+
+        datapoints->push_back (createDatapoint ("do_validity", iv));
+        datapoints->push_back (createDatapoint ("do_cs", cs));
+        datapoints->push_back (
+            createDatapoint ("do_quality_normal_value", nv));
+        if (ts)
+        {
+            datapoints->push_back (createDatapoint ("do_ts", (long)ts));
+            datapoints->push_back (createDatapoint ("do_ts_validity", tsv));
+        }
+
+        DatapointValue dpv (datapoints, true);
+
+        Datapoint* dp = new Datapoint ("data_object", dpv);
+
+        return dp;
+    }
+
+    void
+    setupTest (ConfigCategory& config, PLUGIN_HANDLE& handle,
+               Tase2_Client& client)
+    {
+        config = ConfigCategory ("tase2Config", default_config);
+        handle = plugin_init (&config);
+        plugin_start (handle, "");
+        Thread_sleep (500);
+        client = Tase2_Client_create (nullptr);
+        Tase2_Client_setLocalApTitle (client, "1.1.1.998", 12);
+        Tase2_Client_setRemoteApTitle (client, "1.1.1.999", 12);
+        Tase2_Client_setTcpPort (client, TCP_TEST_PORT);
+    }
+
+    template <class T>
+    void
+    executeTest (Tase2_Client& client, PLUGIN_HANDLE& handle, const char* type,
+                 const char* name, const char* label, T expectedValue)
+    {
+        Tase2_ClientError err
+            = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+        ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+        auto* dataobjects = new vector<Datapoint*>;
+        dataobjects->push_back (createDataObject (
+            type, "icc1", name, expectedValue, "valid", "telemetered",
+            "normal", (uint64_t)100000, "valid"));
+        auto* reading = new Reading (std::string (label), *dataobjects);
+        vector<Reading*> readings;
+        readings.push_back (reading);
+        plugin_send (handle, readings);
+        delete dataobjects;
+        delete reading;
+        readings.clear ();
+        Thread_sleep (50);
+
+        Tase2_PointValue pv
+            = Tase2_Client_readPointValue (client, &err, "icc1", name);
+        ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+        Tase2_DataFlags flags = TASE2_DATA_FLAGS_VALIDITY_VALID
+                                | TASE2_DATA_FLAGS_CURRENT_SOURCE_TELEMETERED
+                                | TASE2_DATA_FLAGS_NORMAL_VALUE;
+
+        DPTYPE dpType = TASE2Datapoint::getDpTypeFromString (type);
+
+        switch (dpType)
+        {
+        case STATE:
+        case STATEQ:
+        case STATEQTIME:
+        case STATEQTIMEEXT: {
+            Tase2_DataState state = Tase2_PointValue_getValueState (pv);
+            ASSERT_EQ (state,
+                       (int)expectedValue | (dpType == STATE ? 0 : flags));
+            break;
+        }
+        case DISCRETE:
+        case DISCRETEQ:
+        case DISCRETEQTIME:
+        case DISCRETEQTIMEEXT: {
+            int value = Tase2_PointValue_getValueDiscrete (pv);
+            ASSERT_EQ (value, (int)expectedValue);
+            break;
+        }
+        case REAL:
+        case REALQ:
+        case REALQTIME:
+        case REALQTIMEEXT: {
+            float value = Tase2_PointValue_getValueReal (pv);
+            ASSERT_EQ (value, (float)expectedValue);
+            break;
+        }
+        case STATESUP:
+        case STATESUPQ:
+        case STATESUPQTIME:
+        case STATESUPQTIMEEXT: {
+            Tase2_DataStateSupplemental stateSup
+                = Tase2_PointValue_getValueStateSupplemental (pv);
+            ASSERT_EQ (stateSup, (int)expectedValue);
+            break;
+        }
+        default: {
+            break;
+        }
+        }
+
+        Tase2_TimeStampClass tsClass
+            = TASE2Datapoint::getTimeStampClass (dpType);
+
+        if (tsClass == TASE2_TIMESTAMP_EXTENDED || tsClass == TASE2_TIMESTAMP)
+        {
+            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 100000);
+        }
+
+        if (pv)
+        {
+            Tase2_PointValue_destroy (pv);
+        }
+        Tase2_Client_destroy (client);
+    }
+};
+
+TEST_F (SendSpontDataTest, SendRealData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+    executeTest<float> (client, handle, "Real", "datapointReal",
+                        "RealTestLabel", 123.45f);
 }
 
-TEST_F (SendSpontDataTest, SendStateQTimeExt)
+TEST_F (SendSpontDataTest, SendRealQData)
 {
-    ConfigCategory config ("tase2Config", default_config);
-    PLUGIN_HANDLE handle = plugin_init (&config);
+    ConfigCategory config;
+    Tase2_Client client;
 
-    plugin_start (handle, "");
+    setupTest (config, handle, client);
+    executeTest<float> (client, handle, "RealQ", "datapointRealQ",
+                        "RealQTestLabel", 234.56f);
+}
 
-    Thread_sleep (500); /* wait for the server to start */
+TEST_F (SendSpontDataTest, SendRealQTimeData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    Tase2_Client client = Tase2_Client_create (nullptr);
+    setupTest (config, handle, client);
+    executeTest<float> (client, handle, "RealQTime", "datapointRealQTime",
+                        "RealQTimeTestLabel", 345.67f);
+}
 
-    Tase2_Client_setLocalApTitle (client, "1.1.1.998", 12);
-    Tase2_Client_setRemoteApTitle (client, "1.1.1.999", 12);
+TEST_F (SendSpontDataTest, SendRealQTimeExtData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    Tase2_Client_setTcpPort (client, TCP_TEST_PORT);
+    setupTest (config, handle, client);
+    executeTest<float> (client, handle, "RealQTimeExt",
+                        "datapointRealQTimeExt", "RealQTimeExtTestLabel",
+                        456.78f);
+}
 
-    Tase2_ClientError err
-        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+TEST_F (SendSpontDataTest, SendStateData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "State", "datapointState",
+                      "StateTestLabel", 1);
+}
 
-    auto* dataobjects = new vector<Datapoint*>;
+TEST_F (SendSpontDataTest, SendStateQData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    dataobjects->push_back (createDataObject (
-        "StateQTime", "icc1", "datapoint1", (int64_t)1, "valid", "telemetered",
-        "normal", (uint64_t)100000, "valid"));
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateQ", "datapointStateQ",
+                      "StateQTestLabel", 2);
+}
 
-    Reading* reading = new Reading (std::string ("TS1"), *dataobjects);
+TEST_F (SendSpontDataTest, SendStateQTimeData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    vector<Reading*> readings;
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateQTime", "datapointStateQTime",
+                      "StateQTimeTestLabel", 3);
+}
 
-    readings.push_back (reading);
+TEST_F (SendSpontDataTest, SendStateQTimeExtData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    plugin_send (handle, readings);
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateQTimeExt",
+                      "datapointStateQTimeExt", "StateQTimeExtTestLabel", 4);
+}
 
-    Thread_sleep (1000);
+TEST_F (SendSpontDataTest, SendDiscreteData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    const Tase2_PointValue& pv
-        = Tase2_Client_readPointValue (client, &err, "icc1", "datapoint1");
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "Discrete", "datapointDiscrete",
+                      "DiscreteTestLabel", 5);
+}
 
-    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+TEST_F (SendSpontDataTest, SendDiscreteQData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    Tase2_DataState state = Tase2_PointValue_getValueState (pv);
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "DiscreteQ", "datapointDiscreteQ",
+                      "DiscreteQTestLabel", 6);
+}
 
-    ASSERT_EQ (state, 1);
+TEST_F (SendSpontDataTest, SendDiscreteQTimeData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
 
-    Tase2_Client_destroy (client);
-    plugin_shutdown (handle);
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "DiscreteQTime",
+                      "datapointDiscreteQTime", "DiscreteQTimeTestLabel", 7);
+}
+
+TEST_F (SendSpontDataTest, SendDiscreteQTimeExtData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "DiscreteQTimeExt",
+                      "datapointDiscreteQTimeExt", "DiscreteQTimeExtTestLabel",
+                      8);
+}
+
+TEST_F (SendSpontDataTest, SendStateSupData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateSup", "datapointStateSup",
+                      "StateSupTestLabel", 9);
+}
+
+TEST_F (SendSpontDataTest, SendStateSupQData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateSupQ", "datapointStateSupQ",
+                      "StateSupQTestLabel", 10);
+}
+
+TEST_F (SendSpontDataTest, SendStateSupQTimeData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateSupQTime",
+                      "datapointStateSupQTime", "StateSupQTimeTestLabel", 11);
+}
+
+TEST_F (SendSpontDataTest, SendStateSupQTimeExtData)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateSupQTimeExt",
+                      "datapointStateSupQTimeExt", "StateSupQTimeExtTestLabel",
+                      12);
 }

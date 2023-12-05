@@ -65,7 +65,7 @@ class TASE2Datapoint
     getTimeStampClass (DPTYPE type)
     {
         return static_cast<Tase2_TimeStampClass> (type % 4 < 2 ? 0
-                                                               : type % 4 - 2);
+                                                               : type % 4 - 1);
     };
 
     DPTYPE

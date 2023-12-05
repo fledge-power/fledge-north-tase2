@@ -245,7 +245,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
-                Tase2_IndicationPoint_setReal (ip, value->toDouble ());
+                Tase2_IndicationPoint_setReal (ip, (float)value->toDouble ());
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
@@ -261,7 +261,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
-                Tase2_IndicationPoint_setRealQ (ip, value->toDouble (),
+                Tase2_IndicationPoint_setRealQ (ip, (float)value->toDouble (),
                                                 dataFlags);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
@@ -279,7 +279,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setRealQTimeStamp (
-                    ip, value->toDouble (), dataFlags, timestamp / 1000);
+                    ip, (float)value->toDouble (), dataFlags, timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
@@ -296,7 +296,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setRealQTimeStamp (
-                    ip, value->toDouble (), dataFlags, timestamp);
+                    ip, (float)value->toDouble (), dataFlags, timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
@@ -350,7 +350,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 Tase2_IndicationPoint_setStateTimeStamp (
                     ip,
                     static_cast<Tase2_DataState> (value->toInt () | dataFlags),
-                    timestamp / 1000);
+                    timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
@@ -419,7 +419,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setDiscreteQTimeStamp (
-                    ip, value->toInt (), dataFlags, timestamp / 1000);
+                    ip, value->toInt (), dataFlags, timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
@@ -492,7 +492,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 Tase2_IndicationPoint_setStateSupplementalQTimeStamp (
                     ip,
                     static_cast<Tase2_DataStateSupplemental> (value->toInt ()),
-                    dataFlags, timestamp / 1000);
+                    dataFlags, timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
@@ -516,6 +516,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 break;
             }
             }
+            if (value)
+                delete value;
         }
         n++;
     }
