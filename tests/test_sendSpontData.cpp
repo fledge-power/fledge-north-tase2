@@ -549,7 +549,7 @@ class SendSpontDataTest : public testing::Test
         auto* dataobjects = new vector<Datapoint*>;
         dataobjects->push_back (createDataObject (
             type, "icc1", name, expectedValue, "valid", "telemetered",
-            "normal", (uint64_t)100000, "valid"));
+            "normal", (uint64_t)123456, "valid"));
         auto* reading = new Reading (std::string (label), *dataobjects);
         vector<Reading*> readings;
         readings.push_back (reading);
@@ -613,9 +613,13 @@ class SendSpontDataTest : public testing::Test
         Tase2_TimeStampClass tsClass
             = TASE2Datapoint::getTimeStampClass (dpType);
 
-        if (tsClass == TASE2_TIMESTAMP_EXTENDED || tsClass == TASE2_TIMESTAMP)
+        if (tsClass == TASE2_TIMESTAMP_EXTENDED)
         {
-            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 100000);
+            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123456);
+        }
+        else if (tsClass == TASE2_TIMESTAMP)
+        {
+            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123000);
         }
 
         if (pv)

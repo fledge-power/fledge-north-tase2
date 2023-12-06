@@ -41,6 +41,10 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
                                  Tase2_BilateralTable_getID (blt));
         Tase2_Server_addBilateralTable (m_server, blt);
     }
+
+    Tase2_Server_setOperateHandler (m_server, operateHandler, this);
+    Tase2_Server_setSelectHandler (m_server, selectHandler, this);
+    Tase2_Server_setSetTagHandler (m_server, setTagHandler, this);
 }
 
 void
@@ -69,6 +73,163 @@ TASE2Server::stop ()
     {
         Tase2_Server_destroy (m_server);
     }
+}
+
+Tase2_HandlerResult
+TASE2Server::selectHandler (void* parameter, Tase2_ControlPoint controlPoint)
+{
+    auto server = (TASE2Server*)parameter;
+
+    Tase2Utility::log_debug ("Received operate command\n");
+
+    Tase2_ControlPointType type = Tase2_ControlPoint_getType (controlPoint);
+
+    std::string domain
+        = Tase2_Domain_getName (Tase2_ControlPoint_getDomain (controlPoint));
+    std::string name = Tase2_ControlPoint_getName (controlPoint);
+
+    std::string scope = domain == "vcc" ? "vcc" : "domain";
+
+    Tase2Utility::log_debug ("Received select for %s:%s\n", domain, name);
+
+    switch (type)
+    {
+    case TASE2_CONTROL_TYPE_COMMAND: {
+        server->forwardCommand (scope, domain, name, "Command", 123456,
+                                nullptr, true);
+        break;
+    }
+    case TASE2_CONTROL_TYPE_SETPOINT_DESCRETE: {
+        server->forwardCommand (scope, domain, name, "SetPointDiscrete",
+                                123456, nullptr, true);
+        break;
+    }
+    case TASE2_CONTROL_TYPE_SETPOINT_REAL: {
+        server->forwardCommand (scope, domain, name, "SetpointReal", 123456,
+                                nullptr, true);
+        break;
+    }
+    }
+
+    return TASE2_RESULT_SUCCESS;
+}
+
+Tase2_HandlerResult
+TASE2Server::setTagHandler (void* parameter, Tase2_ControlPoint controlPoint,
+                            Tase2_TagValue value, const char* reason)
+{
+    Tase2Utility::log_debug (
+        "Set tag value %i for control %s\n", value,
+        Tase2_DataPoint_getName ((Tase2_DataPoint)controlPoint));
+
+    Tase2Utility::log_debug ("   reason given by client: %s\n", reason);
+
+    return TASE2_RESULT_SUCCESS;
+}
+
+Tase2_HandlerResult
+TASE2Server::operateHandler (void* parameter, Tase2_ControlPoint controlPoint,
+                             Tase2_OperateValue value)
+{
+    auto server = (TASE2Server*)parameter;
+    Tase2Utility::log_debug ("Received operate command\n");
+
+    Tase2_ControlPointType type = Tase2_ControlPoint_getType (controlPoint);
+
+    std::string domain
+        = Tase2_Domain_getName (Tase2_ControlPoint_getDomain (controlPoint));
+    std::string name = Tase2_ControlPoint_getName (controlPoint);
+
+    std::string scope = domain == "vcc" ? "vcc" : "domain";
+
+    switch (type)
+    {
+    case TASE2_CONTROL_TYPE_COMMAND: {
+        server->forwardCommand (scope, domain, name, "Command", 123456, &value,
+                                false);
+        break;
+    }
+    case TASE2_CONTROL_TYPE_SETPOINT_DESCRETE: {
+        server->forwardCommand (scope, domain, name, "SetPointDiscrete",
+                                123456, &value, false);
+        break;
+    }
+    case TASE2_CONTROL_TYPE_SETPOINT_REAL: {
+        server->forwardCommand (scope, domain, name, "SetpointReal", 123456,
+                                &value, false);
+        break;
+    }
+    }
+    return TASE2_RESULT_SUCCESS;
+}
+
+enum CommandParameters
+{
+    TYPE,
+    SCOPE,
+    DOMAIN,
+    NAME,
+    VALUE,
+    SELECT,
+    TS
+};
+
+void
+TASE2Server::forwardCommand (const std::string& scope,
+                             const std::string& domain,
+                             const std::string& name, const std::string& type,
+                             uint64_t ts, Tase2_OperateValue* value,
+                             bool select)
+{
+    int parameterCount = 7;
+    char* s_scope = (char*)scope.c_str ();
+    char* s_type = (char*)type.c_str ();
+    char* s_domain = (char*)domain.c_str ();
+    char* s_name = (char*)name.c_str ();
+    char* s_val = "";
+    char* s_select = (char*)(select ? "1" : "0");
+    char* s_ts = (char*)"";
+
+    std::string val;
+
+    char* parameters[parameterCount];
+    char* names[parameterCount];
+
+    names[TYPE] = (char*)"co_type";
+    names[SCOPE] = (char*)"co_scope";
+    names[DOMAIN] = (char*)"co_domain";
+    names[NAME] = (char*)"co_name";
+    names[VALUE] = (char*)"co_value";
+    names[SELECT] = (char*)"co_se";
+    names[TS] = (char*)"co_ts";
+
+    if (!select)
+    {
+        if (type == "Command")
+        {
+            val = std::to_string (value->commandValue);
+        }
+        else if (type == "SetPointDiscrete")
+        {
+            val = std::to_string (value->discreteValue);
+        }
+        else if (type == "SetPointReal")
+        {
+            val = std::to_string (value->realValue);
+        }
+    }
+    s_val = (char*)val.c_str ();
+
+    parameters[TYPE] = s_type;
+    parameters[SCOPE] = s_scope;
+    parameters[DOMAIN] = s_domain;
+    parameters[NAME] = s_name;
+    parameters[VALUE] = s_val;
+    parameters[SELECT] = s_select;
+    parameters[TS] = s_ts;
+
+    m_oper ((char*)"TASE2Command", parameterCount, names, parameters,
+            DestinationBroadcast, NULL);
 }
 
 uint32_t
@@ -193,7 +354,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     timestamp = (uint64_t)attrVal.toInt ();
                     hasTs = true;
                 }
-                else if (objDp->getName () == "dp_ts_validity")
+                else if (objDp->getName () == "do_ts_validity")
                 {
                     std::string tsValidity
                         = objDp->getData ().toStringValue ();
@@ -266,23 +427,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
-            case REALQTIME: {
-                Tase2Utility::log_debug ("Datapoint is REALQTIME %s",
-                                         dp->toJSONProperty ().c_str ());
-                if (value->getType () != DatapointValue::T_FLOAT)
-                {
-                    Tase2Utility::log_debug (
-                        "Skipping datapoint: %s, reason: value type is not "
-                        "T_FLOAT for REALQTIME",
-                        dp->toJSONProperty ().c_str ());
-                    continue;
-                }
-                Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
-                Tase2_IndicationPoint_setRealQTimeStamp (
-                    ip, (float)value->toDouble (), dataFlags, timestamp);
-                Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
-            }
+            case REALQTIME:
             case REALQTIMEEXT: {
                 Tase2Utility::log_debug ("Datapoint is REALQTIME %s",
                                          dp->toJSONProperty ().c_str ());
@@ -335,25 +480,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
-            case STATEQTIME: {
-                Tase2Utility::log_debug ("Datapoint is STATEQTIME %s",
-                                         dp->toJSONProperty ().c_str ());
-                if (value->getType () != DatapointValue::T_INTEGER)
-                {
-                    Tase2Utility::log_debug (
-                        "Skipping datapoint: %s, reason: value type is not "
-                        "T_INTEGER for STATEQTIME",
-                        dp->toJSONProperty ().c_str ());
-                    continue;
-                }
-                Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
-                Tase2_IndicationPoint_setStateTimeStamp (
-                    ip,
-                    static_cast<Tase2_DataState> (value->toInt () | dataFlags),
-                    timestamp);
-                Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
-            }
+            case STATEQTIME:
             case STATEQTIMEEXT: {
                 Tase2Utility::log_debug ("Datapoint is STATEQTIME %s",
                                          dp->toJSONProperty ().c_str ());
@@ -406,23 +533,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
-            case DISCRETEQTIME: {
-                Tase2Utility::log_debug ("Datapoint is DISCRETEQTIME %s",
-                                         dp->toJSONProperty ().c_str ());
-                if (value->getType () != DatapointValue::T_INTEGER)
-                {
-                    Tase2Utility::log_debug (
-                        "Skipping datapoint: %s, reason: value type is not "
-                        "T_INTEGER for DISCRETEQTIME",
-                        dp->toJSONProperty ().c_str ());
-                    continue;
-                }
-                Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
-                Tase2_IndicationPoint_setDiscreteQTimeStamp (
-                    ip, value->toInt (), dataFlags, timestamp);
-                Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
-            }
+            case DISCRETEQTIME:
             case DISCRETEQTIMEEXT: {
                 Tase2Utility::log_debug ("Datapoint is DISCRETEQTIMEEXT %s",
                                          dp->toJSONProperty ().c_str ());
@@ -477,25 +588,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
                 break;
             }
-            case STATESUPQTIME: {
-                Tase2Utility::log_debug ("Datapoint is STATESUPQTIME %s",
-                                         dp->toJSONProperty ().c_str ());
-                if (value->getType () != DatapointValue::T_INTEGER)
-                {
-                    Tase2Utility::log_debug (
-                        "Skipping datapoint: %s, reason: value type is not "
-                        "T_INTEGER for STATESUPQTIME",
-                        dp->toJSONProperty ().c_str ());
-                    continue;
-                }
-                Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
-                Tase2_IndicationPoint_setStateSupplementalQTimeStamp (
-                    ip,
-                    static_cast<Tase2_DataStateSupplemental> (value->toInt ()),
-                    dataFlags, timestamp);
-                Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
-            }
+            case STATESUPQTIME:
             case STATESUPQTIMEEXT: {
                 Tase2Utility::log_debug ("Datapoint is STATESUPQTIMEEXT %s",
                                          dp->toJSONProperty ().c_str ());
@@ -516,8 +609,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 break;
             }
             }
-            if (value)
-                delete value;
+            delete value;
         }
         n++;
     }

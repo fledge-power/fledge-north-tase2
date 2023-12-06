@@ -74,8 +74,6 @@ class TASE2Server
                                             char* names[], char* parameters[],
                                             ControlDestination destination,
                                             ...));
-    bool forwardCommand (Tase2_ControlPoint point, Tase2_OperateValue ctlVal,
-                         bool test, TASE2Datapoint* dp);
 
     void updateDatapointInServer (std::shared_ptr<TASE2Datapoint>,
                                   bool timeSynced);
@@ -115,11 +113,20 @@ class TASE2Server
 
     bool createTLSConfiguration ();
 
-    static Tase2_HandlerResult operateHandler (void* parameter,
-                                               Tase2_ControlPoint action,
-                                               Tase2_OperateValue value);
+    static Tase2_HandlerResult selectHandler (void* parameter,
+                                              Tase2_ControlPoint controlPoint);
 
-    bool forwardCommand ();
+    static Tase2_HandlerResult setTagHandler (void* parameter,
+                                              Tase2_ControlPoint controlPoint,
+                                              Tase2_TagValue value,
+                                              const char* reason);
+
+    void forwardCommand (const std::string& scope, const std::string& domain,
+                         const std::string& name, const std::string& type,
+                         uint64_t ts, Tase2_OperateValue* value, bool select);
+    static Tase2_HandlerResult operateHandler (void* parameter,
+                                               Tase2_ControlPoint controlPoint,
+                                               Tase2_OperateValue value);
 
     FRIEND_TEST (ConnectionHandlerTest, NormalConnection);
     FRIEND_TEST (ControlTest, NormalConnection);

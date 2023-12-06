@@ -39,7 +39,6 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                                 Tase2_DataModel model)
 {
     Document document;
-
     if (document.Parse (const_cast<char*> (modelConfig.c_str ()))
             .HasParseError ())
     {
@@ -273,7 +272,7 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                 }
 
                 auto deviceClass = static_cast<Tase2_DeviceClass> (
-                    datapoint["mode"].GetString () == "sbo");
+                    datapoint["mode"].GetString () != "sbo");
 
                 bool hasTag = datapoint["hasTag"].GetBool ();
 
