@@ -23,30 +23,46 @@
 #include "tase2_datapoint.hpp"
 #include "tase2_utility.hpp"
 
-struct sOutputData
-{
-    char* targetObjRef;
-    char* targetValue;
-};
-
-typedef struct sOutputData* OutputData;
-
-class TASE2ServerException : public std::exception // NOSONAR
+class TASE2OutstandingCommand
 {
   public:
-    explicit TASE2ServerException (const std::string& context)
-        : m_context (context)
-    {
-    }
+    TASE2OutstandingCommand (const std::string& domain,
+                             const std::string& name, int cmdExecTimeout,
+                             bool isSelect);
+    ~TASE2OutstandingCommand () = default;
 
-    const std::string&
-    getContext (void)
+    bool hasTimedOut (uint64_t currentTime);
+
+    std::string
+    Domain ()
     {
-        return m_context;
+        return m_domain;
+    };
+    std::string
+    Name ()
+    {
+        return m_name;
+    };
+
+    bool
+    isSelect ()
+    {
+        return m_select;
     };
 
   private:
-    const std::string m_context;
+    std::string m_domain;
+    std::string m_name;
+
+    bool m_select;
+
+    int m_cmdExecTimeout;
+
+    uint64_t m_commandRcvdTime = 0;
+    uint64_t m_nextTimeout = 0;
+
+    int m_state = 0; /* 0 - idle/complete, 1 - waiting for ACT-CON, 2 - waiting
+                        for ACT-TERM */
 };
 
 class TASE2Server
@@ -68,6 +84,7 @@ class TASE2Server
         m_modelPath = path;
     };
     void configure (const ConfigCategory* conf);
+    void handleActCon (const std::string& domain, const std::string& name);
     uint32_t send (const std::vector<Reading*>& readings);
     void stop ();
     void registerControl (int (*operation) (char* operation, int paramCount,
@@ -92,6 +109,9 @@ class TASE2Server
     std::vector<std::pair<TASE2Server*, TASE2Datapoint*>*>* sdpObjects
         = nullptr;
 
+    std::vector<TASE2OutstandingCommand*> m_outstandingCommands;
+    std::mutex m_outstandingCommandsLock;
+
     Semaphore outputQueueLock = nullptr;
     LinkedList outputQueue = nullptr;
 
@@ -104,6 +124,8 @@ class TASE2Server
     std::string m_name;
     TASE2Config* m_config = nullptr;
 
+    std::thread* m_monitoringThread = nullptr;
+
     std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> >
         m_modelEntries;
 
@@ -112,6 +134,12 @@ class TASE2Server
         = NULL;
 
     bool createTLSConfiguration ();
+    void _monitoringThread ();
+
+    void addToOutstandingCommands (const std::string& domain,
+                                   const std::string& name, bool isSelect);
+
+    void removeAllOutstandingCommands ();
 
     static Tase2_HandlerResult selectHandler (void* parameter,
                                               Tase2_ControlPoint controlPoint);
@@ -129,8 +157,8 @@ class TASE2Server
                                                Tase2_OperateValue value);
 
     FRIEND_TEST (ConnectionHandlerTest, NormalConnection);
-    FRIEND_TEST (ControlTest, NormalConnection);
-    FRIEND_TEST (ControlTest, SendSpcCommand);
+    FRIEND_TEST (ControlTest, OutstandingCommandSuccess);
+    FRIEND_TEST (ControlTest, OutstandingCommandFailure);
 };
 
 class ServerDatapointPair

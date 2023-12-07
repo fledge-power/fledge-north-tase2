@@ -1,6 +1,7 @@
 #include "tase2_config.hpp"
 #include "tase2_datapoint.hpp"
 #include <libtase2/tase2_common.h>
+#include <libtase2/tase2_endpoint.h>
 #include <libtase2/tase2_model.h>
 #include <libtase2/tase2_server.h>
 #include <tase2.hpp>
@@ -8,6 +9,16 @@
 #include <stdbool.h>
 #include <string>
 #include <vector>
+
+static uint64_t
+GetCurrentTimeInMs ()
+{
+    struct timeval now;
+
+    gettimeofday (&now, nullptr);
+
+    return ((uint64_t)now.tv_sec * 1000LL) + (now.tv_usec / 1000);
+}
 
 TASE2Server::TASE2Server () : m_started (false), m_config (new TASE2Config ())
 {
@@ -17,6 +28,13 @@ TASE2Server::TASE2Server () : m_started (false), m_config (new TASE2Config ())
 TASE2Server::~TASE2Server ()
 {
     stop ();
+    if (m_monitoringThread)
+    {
+        m_monitoringThread->join ();
+        delete m_monitoringThread;
+    }
+
+    removeAllOutstandingCommands ();
 
     delete m_config;
 }
@@ -50,6 +68,16 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
 void
 TASE2Server::start ()
 {
+    m_started = true;
+    m_monitoringThread
+        = new std::thread (&TASE2Server::_monitoringThread, this);
+}
+
+void
+TASE2Server::_monitoringThread ()
+{
+    Tase2Utility::log_debug ("Monitoring thread called");
+
     if (!m_server)
     {
         Tase2Utility::log_error ("No server, can't start");
@@ -60,11 +88,74 @@ TASE2Server::start ()
     Tase2_Server_setTcpPort (m_server, m_config->TcpPort ());
 
     Tase2_Server_start (m_server);
+
+    while (m_started)
+    {
+        /* check timeouts for outstanding commands */
+        m_outstandingCommandsLock.lock ();
+
+        uint64_t currentTime = Hal_getTimeInMs ();
+
+        for (auto it = m_outstandingCommands.begin ();
+             it != m_outstandingCommands.end ();)
+        {
+            if ((*it)->hasTimedOut (currentTime))
+            {
+                Tase2Utility::log_warn (
+                    "command %s:%s timeout", (*it)->Domain ().c_str (),
+                    (*it)->Name ().c_str ()); // LCOV_EXCL_LINE
+
+                delete *it;
+                it = m_outstandingCommands.erase (it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+
+        m_outstandingCommandsLock.unlock ();
+
+        Thread_sleep (100);
+    }
+}
+
+void
+TASE2Server::addToOutstandingCommands (const std::string& domain,
+                                       const std::string& name, bool isSelect)
+{
+    m_outstandingCommandsLock.lock ();
+
+    TASE2OutstandingCommand* outstandingCommand = new TASE2OutstandingCommand (
+        domain, name, m_config->CmdExecTimeout (), isSelect);
+
+    m_outstandingCommands.push_back (outstandingCommand);
+
+    m_outstandingCommandsLock.unlock ();
+}
+
+void
+TASE2Server::removeAllOutstandingCommands ()
+{
+    m_outstandingCommandsLock.lock ();
+
+    std::vector<TASE2OutstandingCommand*>::iterator it;
+
+    for (auto oc : m_outstandingCommands)
+    {
+        TASE2OutstandingCommand* outstandingCommand = *it;
+        delete oc;
+    }
+
+    m_outstandingCommands.clear ();
+
+    m_outstandingCommandsLock.unlock ();
 }
 
 void
 TASE2Server::stop ()
 {
+    m_started = false;
     if (m_model)
     {
         Tase2_DataModel_destroy (m_model);
@@ -95,18 +186,18 @@ TASE2Server::selectHandler (void* parameter, Tase2_ControlPoint controlPoint)
     switch (type)
     {
     case TASE2_CONTROL_TYPE_COMMAND: {
-        server->forwardCommand (scope, domain, name, "Command", 123456,
-                                nullptr, true);
+        server->forwardCommand (scope, domain, name, "Command",
+                                GetCurrentTimeInMs (), nullptr, true);
         break;
     }
     case TASE2_CONTROL_TYPE_SETPOINT_DESCRETE: {
         server->forwardCommand (scope, domain, name, "SetPointDiscrete",
-                                123456, nullptr, true);
+                                GetCurrentTimeInMs (), nullptr, true);
         break;
     }
     case TASE2_CONTROL_TYPE_SETPOINT_REAL: {
-        server->forwardCommand (scope, domain, name, "SetpointReal", 123456,
-                                nullptr, true);
+        server->forwardCommand (scope, domain, name, "SetPointReal",
+                                GetCurrentTimeInMs (), nullptr, true);
         break;
     }
     }
@@ -145,18 +236,18 @@ TASE2Server::operateHandler (void* parameter, Tase2_ControlPoint controlPoint,
     switch (type)
     {
     case TASE2_CONTROL_TYPE_COMMAND: {
-        server->forwardCommand (scope, domain, name, "Command", 123456, &value,
-                                false);
+        server->forwardCommand (scope, domain, name, "Command",
+                                GetCurrentTimeInMs (), &value, false);
         break;
     }
     case TASE2_CONTROL_TYPE_SETPOINT_DESCRETE: {
         server->forwardCommand (scope, domain, name, "SetPointDiscrete",
-                                123456, &value, false);
+                                GetCurrentTimeInMs (), &value, false);
         break;
     }
     case TASE2_CONTROL_TYPE_SETPOINT_REAL: {
-        server->forwardCommand (scope, domain, name, "SetpointReal", 123456,
-                                &value, false);
+        server->forwardCommand (scope, domain, name, "SetPointReal",
+                                GetCurrentTimeInMs (), &value, false);
         break;
     }
     }
@@ -181,14 +272,28 @@ TASE2Server::forwardCommand (const std::string& scope,
                              uint64_t ts, Tase2_OperateValue* value,
                              bool select)
 {
+
+    std::shared_ptr<TASE2Datapoint> t2dp
+        = m_config->getDatapointByReference (domain, name);
+
+    if (!t2dp || !t2dp->inExchangedDefinitions ())
+    {
+        Tase2Utility::log_debug (
+            "Skipping command: %s %s, reason: datapoints is not in "
+            "Exchanged Definitions",
+            domain.c_str (), name.c_str ());
+        return;
+    }
+
     int parameterCount = 7;
+    std::string tsStr = std::to_string (ts);
     char* s_scope = (char*)scope.c_str ();
     char* s_type = (char*)type.c_str ();
     char* s_domain = (char*)domain.c_str ();
     char* s_name = (char*)name.c_str ();
     char* s_val = "";
     char* s_select = (char*)(select ? "1" : "0");
-    char* s_ts = (char*)"";
+    char* s_ts = (char*)tsStr.c_str ();
 
     std::string val;
 
@@ -203,6 +308,7 @@ TASE2Server::forwardCommand (const std::string& scope,
     names[SELECT] = (char*)"co_se";
     names[TS] = (char*)"co_ts";
 
+    Tase2Utility::log_debug ("%s", type.c_str ());
     if (!select)
     {
         if (type == "Command")
@@ -228,8 +334,41 @@ TASE2Server::forwardCommand (const std::string& scope,
     parameters[SELECT] = s_select;
     parameters[TS] = s_ts;
 
+    addToOutstandingCommands (domain, name, select);
+
     m_oper ((char*)"TASE2Command", parameterCount, names, parameters,
             DestinationBroadcast, NULL);
+}
+
+void
+TASE2Server::handleActCon (const std::string& domain, const std::string& name)
+{
+    m_outstandingCommandsLock.lock ();
+
+    for (std::vector<TASE2OutstandingCommand*>::iterator it
+         = m_outstandingCommands.begin ();
+         it != m_outstandingCommands.end (); it++)
+    {
+        TASE2OutstandingCommand* outstandingCommand = *it;
+
+        if (outstandingCommand->Domain () == domain
+            && outstandingCommand->Name () == name)
+        {
+            m_outstandingCommands.erase (it);
+
+            Tase2Utility::log_debug (
+                "Outstanding command %i:%i confirmation  "
+                "-> remove",
+                outstandingCommand->Domain (),
+                outstandingCommand->Name ()); // LCOV_EXCL_LINE
+
+            delete outstandingCommand;
+
+            break; // LCOV_EXCL_LINE
+        }
+    }
+
+    m_outstandingCommandsLock.unlock ();
 }
 
 uint32_t
@@ -364,6 +503,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 }
             }
 
+            handleActCon (domain, name);
+
             DPTYPE dpType;
             if (type == -1)
             {
@@ -381,6 +522,15 @@ TASE2Server::send (const std::vector<Reading*>& readings)
             {
                 Tase2Utility::log_debug (
                     "Skipping datapoint: %s, reason: t2dp is null",
+                    dp->toJSONProperty ().c_str ());
+                continue;
+            }
+
+            if (!t2dp->inExchangedDefinitions ())
+            {
+                Tase2Utility::log_debug (
+                    "Skipping datapoint: %s, reason: datapoints is not in "
+                    "Exchanged Definitions",
                     dp->toJSONProperty ().c_str ());
                 continue;
             }

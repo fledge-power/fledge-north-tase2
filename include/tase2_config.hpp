@@ -60,6 +60,14 @@ class TASE2Config
     std::shared_ptr<TASE2Datapoint>
     getDatapointByReference (const std::string& ref, const std::string& name);
 
+    int
+    CmdExecTimeout ()
+    {
+        return m_cmdExecTimeout;
+    };
+
+    int m_cmdExecTimeout = 5;
+
   private:
     static bool isValidIPAddress (const std::string& addrStr);
 

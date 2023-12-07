@@ -136,6 +136,32 @@ class TASE2Datapoint
     bool updateDatapoint (Datapoint* value, Datapoint* timestamp,
                           Datapoint* quality);
 
+    void
+    setCheckBackId (int16_t id)
+    {
+        m_checkBackId = id;
+    };
+
+    int16_t
+    getCheckBackId ()
+    {
+        return m_checkBackId;
+    };
+
+    bool
+    inExchangedDefinitions ()
+    {
+        return m_inExchangedDefinitions;
+    }
+
+    void
+    setInExchangedDefinitions (bool value)
+    {
+        m_inExchangedDefinitions = value;
+    }
+
+    bool hasTimedOut (uint64_t currentTime);
+
   private:
     std::string m_label;
 
@@ -143,6 +169,8 @@ class TASE2Datapoint
 
     long m_intVal;
     float m_floatVal;
+
+    bool m_inExchangedDefinitions = false;
 
     bool m_hasIntVal;
 
@@ -152,7 +180,11 @@ class TASE2Datapoint
         Tase2_ControlPoint ControlPoint;
     };
 
+    uint64_t m_nextTimeout = 0;
+
     dp m_dp;
+
+    int16_t m_checkBackId;
 
     Tase2_QualityClass m_quality;
     Tase2_TimeStampClass m_timestamp;

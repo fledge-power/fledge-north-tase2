@@ -284,6 +284,8 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                 t2dp->setControlPoint (Tase2_Domain_addControlPoint (
                     icc, t2dp->getLabel ().c_str (), contType, deviceClass,
                     hasTag, checkBackId));
+
+                t2dp->setCheckBackId (checkBackId);
             }
             else
             {
@@ -379,8 +381,6 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
 
         const Value& bltDatapoints = bltValue["datapoints"];
 
-        int n = 1234;
-
         for (const Value& datapoint : bltDatapoints.GetArray ())
         {
             if (!datapoint.IsObject ())
@@ -412,8 +412,8 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
             if (TASE2Datapoint::isCommand (t2dp->getType ()))
             {
                 Tase2_BilateralTable_addControlPoint (
-                    blt, t2dp->getControlPoint (), n++, true, true, true,
-                    true);
+                    blt, t2dp->getControlPoint (), t2dp->getCheckBackId (),
+                    true, true, true, true);
                 Tase2Utility::log_debug (
                     "Added Control Point '%s' to Bilateral Table '%s'",
                     t2dp->getLabel ().c_str (), bltValue["name"].GetString ());
@@ -623,6 +623,8 @@ TASE2Config::importExchangeConfig (const std::string& exchangeConfig,
                                             dpRef.c_str ());
                     continue;
                 }
+
+                itDP->second->setInExchangedDefinitions (true);
             }
             else
             {
