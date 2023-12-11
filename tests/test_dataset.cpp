@@ -292,9 +292,16 @@ static const char* default_config = QUOTE ({
                             { "name" : "datapointStateSupQTimeExt" }
                         ]
                     }
-                ]
+                ],
+                "dataset_transfer_sets" :
+                    [ { "domain" : "icc1", "name" : "DSTrans1" } ],
+                "datasets" : [ {
+                    "name" : "ds1",
+                    "domain" : "icc1",
+                    "datapoints" :
+                        [ "datapointReal", "datapointState" ]
+                } ]
             }
-
         })
     },
 
@@ -467,8 +474,10 @@ static const char* default_config = QUOTE ({
     }
 });
 
+static int dataSetCreated = 0;
+
 // Class to be called in each test, contains fixture to be used in
-class SendSpontDataTest : public testing::Test
+class DatasetTest : public testing::Test
 {
   protected:
     PLUGIN_HANDLE handle;
@@ -476,6 +485,7 @@ class SendSpontDataTest : public testing::Test
     void
     SetUp () override
     {
+        dataSetCreated = 0;
         // Init tase2server object
     }
 
@@ -578,6 +588,109 @@ class SendSpontDataTest : public testing::Test
                 message);
     }
 
+    static void
+    dataSetEventHandler (void* parameter, bool create,
+                         Tase2_Endpoint_Connection peer,
+                         Tase2_BilateralTable clientBlt,
+                         Tase2_Domain dataSetDomain, char* dataSetName,
+                         LinkedList dataPoints)
+    {
+        if (create)
+        {
+            printf ("Created new data set %s:%s with data points\n",
+                    dataSetDomain ? dataSetDomain->name : "(VCC)",
+                    dataSetName);
+
+            dataSetCreated++;
+
+            if (peer)
+            {
+                printf ("  client: IP: %s ap-title: %s ae-qualifier: %i\n",
+                        Tase2_Endpoint_Connection_getPeerIpAddress (peer),
+                        Tase2_Endpoint_Connection_getPeerApTitle (peer),
+                        Tase2_Endpoint_Connection_getPeerAeQualifier (peer));
+            }
+
+            if (clientBlt)
+            {
+                printf ("  BLT: %s\n", Tase2_BilateralTable_getID (clientBlt));
+            }
+
+            LinkedList dataPointElem = LinkedList_getNext (dataPoints);
+
+            while (dataPointElem)
+            {
+                Tase2_DataPoint dataPoint
+                    = (Tase2_DataPoint)LinkedList_getData (dataPointElem);
+
+                printf ("  data point: %s:%s\n",
+                        Tase2_DataPoint_getDomain (dataPoint)->name
+                            ? Tase2_DataPoint_getDomain (dataPoint)->name
+                            : "[VCC]",
+                        Tase2_DataPoint_getName (dataPoint));
+
+                dataPointElem = LinkedList_getNext (dataPointElem);
+            }
+        }
+    }
+
+    static void
+    dsTransferSetUpdateHandler (void* parameter,
+                                Tase2_Endpoint_Connection peer,
+                                Tase2_BilateralTable clientBlt,
+                                Tase2_DSTransferSet transferSet,
+                                bool isEnabled)
+    {
+        printf ("DS transfer set %s is updated\n",
+                Tase2_TransferSet_getName ((Tase2_TransferSet)transferSet));
+
+        if (peer)
+        {
+            printf ("  --> client: IP: %s ap-title: %s ae-qualifier: %i\n",
+                    Tase2_Endpoint_Connection_getPeerIpAddress (peer),
+                    Tase2_Endpoint_Connection_getPeerApTitle (peer),
+                    Tase2_Endpoint_Connection_getPeerAeQualifier (peer));
+        }
+
+        if (clientBlt)
+        {
+            printf ("  --> BLT: %s\n", Tase2_BilateralTable_getID (clientBlt));
+        }
+
+        printf ("  Status: %s\n", Tase2_DSTransferSet_getStatus (transferSet)
+                                      ? "enabled"
+                                      : "disabled");
+    }
+
+    static void
+    dsTransferSetSentHandler (void* parameter, Tase2_Endpoint_Connection peer,
+                              Tase2_BilateralTable clientBlt,
+                              Tase2_DSTransferSet ts, LinkedList sentValues,
+                              Tase2_ReportReason reason)
+    {
+        printf ("DS Transfer set %s (reason: %i) was sent with the following "
+                "values:\n",
+                Tase2_TransferSet_getName ((Tase2_TransferSet)ts), reason);
+
+        LinkedList sentValueElem = LinkedList_getNext (sentValues);
+
+        while (sentValueElem)
+        {
+            Tase2_SentPointValue sentValue
+                = (Tase2_SentPointValue)LinkedList_getData (sentValueElem);
+
+            Tase2_DataPoint sentDataPoint
+                = Tase2_SentPointValue_getDataPoint (sentValue);
+            Tase2_PointValue pointValue
+                = Tase2_SentPointValue_getPointValue (sentValue);
+
+            printf ("  data point: %s \n",
+                    Tase2_DataPoint_getName (sentDataPoint));
+
+            sentValueElem = LinkedList_getNext (sentValueElem);
+        }
+    }
+
     template <class T>
     static Datapoint*
     createDatapoint (const std::string& dataname, const T value)
@@ -654,266 +767,81 @@ class SendSpontDataTest : public testing::Test
     {
         config = ConfigCategory ("tase2Config", default_config);
         handle = plugin_init (&config);
+
         plugin_start (handle, "");
         Thread_sleep (500);
         client = Tase2_Client_create (nullptr);
         Tase2_Client_setLocalApTitle (client, "1.1.1.998", 12);
         Tase2_Client_setRemoteApTitle (client, "1.1.1.999", 12);
         Tase2_Client_setTcpPort (client, TCP_TEST_PORT);
-    }
-
-    template <class T>
-    void
-    executeTest (Tase2_Client& client, PLUGIN_HANDLE& handle, const char* type,
-                 const char* name, const char* label, T expectedValue)
-    {
-        Tase2_ClientError err
-            = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
-        ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
-
-        auto* dataobjects = new vector<Datapoint*>;
-        dataobjects->push_back (createDataObject (
-            type, "icc1", name, expectedValue, "valid", "telemetered",
-            "normal", (uint64_t)123456, "valid"));
-        auto* reading = new Reading (std::string (label), *dataobjects);
-        vector<Reading*> readings;
-        readings.push_back (reading);
-        plugin_send (handle, readings);
-        delete dataobjects;
-        delete reading;
-        readings.clear ();
-        Thread_sleep (50);
-
-        Tase2_PointValue pv
-            = Tase2_Client_readPointValue (client, &err, "icc1", name);
-        ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
-
-        Tase2_DataFlags flags = TASE2_DATA_FLAGS_VALIDITY_VALID
-                                | TASE2_DATA_FLAGS_CURRENT_SOURCE_TELEMETERED
-                                | TASE2_DATA_FLAGS_NORMAL_VALUE;
-
-        DPTYPE dpType = TASE2Datapoint::getDpTypeFromString (type);
-
-        switch (dpType)
-        {
-        case STATE:
-        case STATEQ:
-        case STATEQTIME:
-        case STATEQTIMEEXT: {
-            Tase2_DataState state = Tase2_PointValue_getValueState (pv);
-            ASSERT_EQ (state,
-                       (int)expectedValue | (dpType == STATE ? 0 : flags));
-            break;
-        }
-        case DISCRETE:
-        case DISCRETEQ:
-        case DISCRETEQTIME:
-        case DISCRETEQTIMEEXT: {
-            int value = Tase2_PointValue_getValueDiscrete (pv);
-            ASSERT_EQ (value, (int)expectedValue);
-            break;
-        }
-        case REAL:
-        case REALQ:
-        case REALQTIME:
-        case REALQTIMEEXT: {
-            float value = Tase2_PointValue_getValueReal (pv);
-            ASSERT_EQ (value, (float)expectedValue);
-            break;
-        }
-        case STATESUP:
-        case STATESUPQ:
-        case STATESUPQTIME:
-        case STATESUPQTIMEEXT: {
-            Tase2_DataStateSupplemental stateSup
-                = Tase2_PointValue_getValueStateSupplemental (pv);
-            ASSERT_EQ (stateSup, (int)expectedValue);
-            break;
-        }
-        default: {
-            break;
-        }
-        }
-
-        Tase2_TimeStampClass tsClass
-            = TASE2Datapoint::getTimeStampClass (dpType);
-
-        if (tsClass == TASE2_TIMESTAMP_EXTENDED)
-        {
-            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123456);
-        }
-        else if (tsClass == TASE2_TIMESTAMP)
-        {
-            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123000);
-        }
-
-        if (pv)
-        {
-            Tase2_PointValue_destroy (pv);
-        }
-        Tase2_Client_destroy (client);
+        Tase2_Client_connect (client, "localhost", "1.1.1.999", 12);
     }
 };
 
-TEST_F (SendSpontDataTest, SendRealData)
+TEST_F (DatasetTest, CreateDatasetAndUpdate)
 {
     ConfigCategory config;
     Tase2_Client client;
 
     setupTest (config, handle, client);
-    executeTest<float> (client, handle, "Real", "datapointReal",
-                        "RealTestLabel", 123.45f);
+
+    Tase2_ClientError err;
+
+    Tase2_ClientDataSet dataSet
+        = Tase2_Client_getDataSet (client, &err, "icc1", "ds1");
+
+    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
+
+    ASSERT_EQ (Tase2_ClientDataSet_getSize (dataSet), 2);
+    ASSERT_EQ (
+        strcmp (Tase2_ClientDataSet_getPointName (dataSet, 0)->pointName,
+                "datapointReal"),
+        0);
+    ASSERT_EQ (
+        strcmp (Tase2_ClientDataSet_getPointName (dataSet, 1)->pointName,
+                "datapointState"),
+        0);
+    Tase2_Client_destroy (client);
 }
 
-TEST_F (SendSpontDataTest, SendRealQData)
+TEST_F (DatasetTest, ActivateDataTransferSet)
 {
     ConfigCategory config;
     Tase2_Client client;
 
     setupTest (config, handle, client);
-    executeTest<float> (client, handle, "RealQ", "datapointRealQ",
-                        "RealQTestLabel", 234.56f);
-}
 
-TEST_F (SendSpontDataTest, SendRealQTimeData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
+    Tase2_ClientError err;
 
-    setupTest (config, handle, client);
-    executeTest<float> (client, handle, "RealQTime", "datapointRealQTime",
-                        "RealQTimeTestLabel", 345.67f);
-}
+    Tase2_ClientDataSet dataSet
+        = Tase2_Client_getDataSet (client, &err, "icc1", "ds1");
 
-TEST_F (SendSpontDataTest, SendRealQTimeExtData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
+    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
 
-    setupTest (config, handle, client);
-    executeTest<float> (client, handle, "RealQTimeExt",
-                        "datapointRealQTimeExt", "RealQTimeExtTestLabel",
-                        456.78f);
-}
+    Tase2_ClientDSTransferSet dsts
+        = Tase2_Client_getNextDSTransferSet (client, "icc1", &err);
 
-TEST_F (SendSpontDataTest, SendStateData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
+    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
 
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "State", "datapointState",
-                      "StateTestLabel", 1);
-}
+    Tase2_ClientDSTransferSet_setDataSet (dsts, dataSet);
 
-TEST_F (SendSpontDataTest, SendStateQData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
+    ASSERT_EQ (Tase2_ClientDSTransferSet_readValues (dsts, client),
+               TASE2_CLIENT_ERROR_OK);
 
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "StateQ", "datapointStateQ",
-                      "StateQTestLabel", 2);
-}
+    auto* dataobjects = new vector<Datapoint*>;
+    dataobjects->push_back (
+        createDataObject ("Real", "icc1", "datapointReal", 1.2f, "valid",
+                          "telemetered", "normal", (uint64_t)123456, "valid"));
+    auto* reading = new Reading (std::string ("TS3"), *dataobjects);
+    vector<Reading*> readings;
+    readings.push_back (reading);
+    plugin_send (handle, readings);
+    delete dataobjects;
+    delete reading;
 
-TEST_F (SendSpontDataTest, SendStateQTimeData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
+    ASSERT_EQ (Tase2_PointValue_getValueReal (
+                   Tase2_ClientDataSet_getPointValue (dataSet, 0)),
+               1.2f);
 
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "StateQTime", "datapointStateQTime",
-                      "StateQTimeTestLabel", 3);
-}
-
-TEST_F (SendSpontDataTest, SendStateQTimeExtData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "StateQTimeExt",
-                      "datapointStateQTimeExt", "StateQTimeExtTestLabel", 4);
-}
-
-TEST_F (SendSpontDataTest, SendDiscreteData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "Discrete", "datapointDiscrete",
-                      "DiscreteTestLabel", 5);
-}
-
-TEST_F (SendSpontDataTest, SendDiscreteQData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "DiscreteQ", "datapointDiscreteQ",
-                      "DiscreteQTestLabel", 6);
-}
-
-TEST_F (SendSpontDataTest, SendDiscreteQTimeData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "DiscreteQTime",
-                      "datapointDiscreteQTime", "DiscreteQTimeTestLabel", 7);
-}
-
-TEST_F (SendSpontDataTest, SendDiscreteQTimeExtData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "DiscreteQTimeExt",
-                      "datapointDiscreteQTimeExt", "DiscreteQTimeExtTestLabel",
-                      8);
-}
-
-TEST_F (SendSpontDataTest, SendStateSupData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "StateSup", "datapointStateSup",
-                      "StateSupTestLabel", 9);
-}
-
-TEST_F (SendSpontDataTest, SendStateSupQData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "StateSupQ", "datapointStateSupQ",
-                      "StateSupQTestLabel", 10);
-}
-
-TEST_F (SendSpontDataTest, SendStateSupQTimeData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "StateSupQTime",
-                      "datapointStateSupQTime", "StateSupQTimeTestLabel", 11);
-}
-
-TEST_F (SendSpontDataTest, SendStateSupQTimeExtData)
-{
-    ConfigCategory config;
-    Tase2_Client client;
-
-    setupTest (config, handle, client);
-    executeTest<int> (client, handle, "StateSupQTimeExt",
-                      "datapointStateSupQTimeExt", "StateSupQTimeExtTestLabel",
-                      12);
+    Tase2_Client_destroy (client);
 }

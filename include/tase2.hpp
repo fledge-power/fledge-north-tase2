@@ -159,6 +159,8 @@ class TASE2Server
     FRIEND_TEST (ConnectionHandlerTest, NormalConnection);
     FRIEND_TEST (ControlTest, OutstandingCommandSuccess);
     FRIEND_TEST (ControlTest, OutstandingCommandFailure);
+    FRIEND_TEST (DatasetTest, CreateDatasetAndUpdate);
+    friend class DatasetTest;
 };
 
 class ServerDatapointPair

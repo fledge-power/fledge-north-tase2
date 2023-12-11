@@ -66,13 +66,12 @@ class TASE2Config
         return m_cmdExecTimeout;
     };
 
-    int m_cmdExecTimeout = 5;
-
   private:
     static bool isValidIPAddress (const std::string& addrStr);
 
     std::string m_ip = "";
     int m_tcpPort = -1;
+    int m_cmdExecTimeout = 5;
 
     bool m_useTLS = false;
 

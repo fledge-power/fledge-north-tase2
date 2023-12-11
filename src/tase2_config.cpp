@@ -430,6 +430,141 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
         }
         m_bilateral_tables.push_back (blt);
     }
+
+    if (modelConf.HasMember ("dataset_transfer_sets"))
+    {
+        if (!modelConf["dataset_transfer_sets"].IsArray ())
+        {
+            Tase2Utility::log_error ("invalid 'dataset_transfer_sets' "
+                                     "array in 'model_conf'");
+            return;
+        }
+
+        const Value& dtsArray = modelConf["dataset_transfer_sets"];
+
+        for (const Value& dts : dtsArray.GetArray ())
+        {
+            if (!dts.IsObject ())
+            {
+                Tase2Utility::log_error ("DATASET TRANSFER SET NOT AN OBJECT");
+                return;
+            }
+            if (!dts.HasMember ("name") || !dts["name"].IsString ())
+            {
+                Tase2Utility::log_error ("DATASET TRANSFER SET HAS NO NAME");
+                return;
+            }
+            if (!dts.HasMember ("domain") || !dts["domain"].IsString ())
+            {
+                Tase2Utility::log_error ("DATASET TRANSFER SET HAS NO DOMAIN");
+                return;
+            }
+
+            std::string dtsDomainName = dts["domain"].GetString ();
+
+            auto itD = m_domains.find (dtsDomainName);
+            if (itD == m_domains.end ())
+            {
+                Tase2Utility::log_warn ("Invalid Domain %s",
+                                        dtsDomainName.c_str ());
+                continue;
+            }
+
+            Tase2_Domain dtsDomain = itD->second;
+
+            Tase2_Domain_addDSTransferSet (dtsDomain,
+                                           dts["name"].GetString ());
+        }
+    }
+
+    if (modelConf.HasMember ("datasets"))
+    {
+        if (!modelConf["datasets"].IsArray ())
+        {
+            Tase2Utility::log_error ("invalid 'datasets' "
+                                     "array in 'model_conf'");
+            return;
+        }
+
+        const Value& dsArray = modelConf["datasets"];
+
+        for (const Value& ds : dsArray.GetArray ())
+        {
+            if (!ds.IsObject ())
+            {
+                Tase2Utility::log_error ("DATASET TRANSFER SET NOT AN OBJECT");
+                continue;
+            }
+            if (!ds.HasMember ("name") || !ds["name"].IsString ())
+            {
+                Tase2Utility::log_error ("DATASET TRANSFER SET HAS NO NAME");
+                continue;
+            }
+            if (!ds.HasMember ("domain") || !ds["domain"].IsString ())
+            {
+                Tase2Utility::log_error ("DATASET TRANSFER SET HAS NO DOMAIN");
+                continue;
+            }
+
+            std::string dsDomainName = ds["domain"].GetString ();
+
+            auto itD = m_domains.find (dsDomainName);
+            if (itD == m_domains.end ())
+            {
+                Tase2Utility::log_warn ("Invalid Domain %s",
+                                        dsDomainName.c_str ());
+                continue;
+            }
+
+            Tase2_Domain dsDomain = itD->second;
+
+            Tase2_DataSet dataSet
+                = Tase2_Domain_addDataSet (dsDomain, ds["name"].GetString ());
+
+            Tase2Utility::log_debug ("Create dataset %s in domain %s",
+                                     ds["name"].GetString (),
+                                     ds["domain"].GetString ());
+
+            if (!ds.HasMember ("datapoints") || !ds["datapoints"].IsArray ())
+            {
+                Tase2Utility::log_error ("invalid 'datapoints' "
+                                         "array in dataset %s",
+                                         ds["name"].GetString ());
+                continue;
+            }
+
+            const Value& datasetDatapoints = ds["datapoints"];
+
+            for (const Value& dp : datasetDatapoints.GetArray ())
+            {
+                if (!dp.IsString ())
+                {
+                    Tase2Utility::log_error (
+                        "Invalid datapoint in dataset %s (not string)",
+                        ds["name"].GetString ());
+                    continue;
+                }
+
+                if (getDatapointByReference (ds["domain"].GetString (),
+                                             dp.GetString ()))
+                {
+                    Tase2_DataSet_addEntry (dataSet, dsDomain,
+                                            dp.GetString ());
+
+                    Tase2Utility::log_debug ("Add entry %s to dataset %s",
+                                             dp.GetString (),
+                                             ds["name"].GetString ());
+                }
+                else
+                {
+                    Tase2Utility::log_error (
+                        "datapoint %s not found in dataset %s",
+                        dp.GetString (), ds["name"].GetString ());
+                    continue;
+                }
+            }
+        }
+    }
 }
 
 void
