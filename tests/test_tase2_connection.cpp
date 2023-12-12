@@ -15,6 +15,15 @@ static string protocol_stack = QUOTE ({
     }
 });
 
+static string protocol_stack_tls = QUOTE ({
+    "protocol_stack" : {
+        "name" : "tase2north",
+        "version" : "1.0",
+        "transport_layer" :
+            { "srv_ip" : "0.0.0.0", "port" : 10002, "tls" : true }
+    }
+});
+
 static string exchanged_data
     = QUOTE ({ "exchanged_data" : { "datapoints" : [] } });
 
@@ -217,5 +226,45 @@ TEST_F (ConnectionHandlerTest, NormalConnection)
 
     ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
 
+    Tase2_Client_destroy (client);
+}
+
+TEST_F (ConnectionHandlerTest, NormalConnectionTLS)
+{
+    setenv ("FLEDGE_DATA", "../tests/data", 1);
+
+    tase2Server->setJsonConfig (protocol_stack_tls, exchanged_data, tls,
+                                model_config);
+
+    tase2Server->start ();
+
+    Thread_sleep (500); /* wait for the server to start */
+
+    TLSConfiguration tlsConfig = TLSConfiguration_create ();
+
+    TLSConfiguration_addCACertificateFromFile (
+        tlsConfig, "../tests/data/etc/certs/tase2_ca.cer");
+    TLSConfiguration_setOwnCertificateFromFile (
+        tlsConfig, "../tests/data/etc/certs/tase2_client.cer");
+    TLSConfiguration_setOwnKeyFromFile (
+        tlsConfig, "../tests/data/etc/certs/tase2_client.key", NULL);
+    TLSConfiguration_addAllowedCertificateFromFile (
+        tlsConfig, "../tests/data/etc/certs/tase2_server.cer");
+    TLSConfiguration_setChainValidation (tlsConfig, true);
+    TLSConfiguration_setAllowOnlyKnownCertificates (tlsConfig, true);
+
+    Tase2_Client client = Tase2_Client_create (tlsConfig);
+
+    Tase2_Client_setLocalApTitle (client, "1.1.1.998", 12);
+    Tase2_Client_setRemoteApTitle (client, "1.1.1.999", 12);
+
+    Tase2_Client_setTcpPort (client, TCP_TEST_PORT);
+
+    Tase2_ClientError err
+        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+
+    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+    TLSConfiguration_destroy (tlsConfig);
     Tase2_Client_destroy (client);
 }

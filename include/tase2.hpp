@@ -118,6 +118,8 @@ class TASE2Server
     Tase2_Server m_server = nullptr;
     Tase2_DataModel m_model = nullptr;
 
+    TLSConfiguration m_tlsConfig = nullptr;
+
     std::string m_modelPath;
 
     bool m_started;

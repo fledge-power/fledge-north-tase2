@@ -66,6 +66,27 @@ class TASE2Config
         return m_cmdExecTimeout;
     };
 
+    std::string&
+    GetPrivateKey ()
+    {
+        return m_privateKey;
+    };
+    std::string&
+    GetOwnCertificate ()
+    {
+        return m_ownCertificate;
+    };
+    std::vector<std::string>&
+    GetRemoteCertificates ()
+    {
+        return m_remoteCertificates;
+    };
+    std::vector<std::string>&
+    GetCaCertificates ()
+    {
+        return m_caCertificates;
+    };
+
   private:
     static bool isValidIPAddress (const std::string& addrStr);
 

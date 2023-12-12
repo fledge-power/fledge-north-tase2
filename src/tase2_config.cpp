@@ -540,7 +540,7 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                 if (!dp.IsString ())
                 {
                     Tase2Utility::log_error (
-                        "Invalid datapoint in dataset %s (not string)",
+                        "Invalid datapoint in dataset %s (not std::string)",
                         ds["name"].GetString ());
                     continue;
                 }
@@ -676,7 +676,7 @@ TASE2Config::importExchangeConfig (const std::string& exchangeConfig,
     if (document.Parse (const_cast<char*> (exchangeConfig.c_str ()))
             .HasParseError ())
     {
-        Logger::getLogger ()->fatal (
+        Tase2Utility::log_fatal (
             "Parsing error in data exchange configuration");
 
         return;
@@ -774,7 +774,77 @@ TASE2Config::importExchangeConfig (const std::string& exchangeConfig,
 void
 TASE2Config::importTlsConfig (const std::string& tlsConfig)
 {
-    return;
+    Document document;
+
+    if (document.Parse (const_cast<char*> (tlsConfig.c_str ()))
+            .HasParseError ())
+    {
+        Tase2Utility::log_fatal ("Parsing error in TLS configuration");
+
+        return;
+    }
+
+    if (!document.IsObject ())
+        return;
+
+    if (!document.HasMember ("tls_conf") || !document["tls_conf"].IsObject ())
+    {
+        return;
+    }
+
+    const Value& tlsConf = document["tls_conf"];
+
+    if (tlsConf.HasMember ("private_key")
+        && tlsConf["private_key"].IsString ())
+    {
+        m_privateKey = tlsConf["private_key"].GetString ();
+    }
+
+    if (tlsConf.HasMember ("own_cert") && tlsConf["own_cert"].IsString ())
+    {
+        m_ownCertificate = tlsConf["own_cert"].GetString ();
+    }
+
+    if (tlsConf.HasMember ("ca_certs") && tlsConf["ca_certs"].IsArray ())
+    {
+
+        const Value& caCerts = tlsConf["ca_certs"];
+
+        for (const Value& caCert : caCerts.GetArray ())
+        {
+            if (caCert.HasMember ("cert_file"))
+            {
+                if (caCert["cert_file"].IsString ())
+                {
+                    std::string certFileName
+                        = caCert["cert_file"].GetString ();
+
+                    m_caCertificates.push_back (certFileName);
+                }
+            }
+        }
+    }
+
+    if (tlsConf.HasMember ("remote_certs")
+        && tlsConf["remote_certs"].IsArray ())
+    {
+
+        const Value& remoteCerts = tlsConf["remote_certs"];
+
+        for (const Value& remoteCert : remoteCerts.GetArray ())
+        {
+            if (remoteCert.HasMember ("cert_file"))
+            {
+                if (remoteCert["cert_file"].IsString ())
+                {
+                    std::string certFileName
+                        = remoteCert["cert_file"].GetString ();
+
+                    m_remoteCertificates.push_back (certFileName);
+                }
+            }
+        }
+    }
 }
 
 int

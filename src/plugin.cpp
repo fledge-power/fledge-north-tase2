@@ -249,7 +249,7 @@ extern "C"
     void
     plugin_start (const PLUGIN_HANDLE handle, const string& storedData)
     {
-        Logger::getLogger ()->warn ("Plugin start called");
+        Tase2Utility::log_warn ("Plugin start called");
         TASE2Server* tase2 = (TASE2Server*)handle;
         if (tase2)
         {

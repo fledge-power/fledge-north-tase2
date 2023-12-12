@@ -5,6 +5,7 @@
 #include <libtase2/tase2_model.h>
 #include <libtase2/tase2_server.h>
 #include <tase2.hpp>
+#include <utils.h>
 
 #include <stdbool.h>
 #include <string>
@@ -36,6 +37,11 @@ TASE2Server::~TASE2Server ()
 
     removeAllOutstandingCommands ();
 
+    if (m_tlsConfig)
+    {
+        TLSConfiguration_destroy (m_tlsConfig);
+    }
+
     delete m_config;
 }
 
@@ -49,9 +55,19 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
     m_config->importModelConfig (modelConfig, m_model);
     m_config->importExchangeConfig (dataExchangeConfig, m_model);
     m_config->importProtocolConfig (stackConfig);
-    m_config->importTlsConfig (tlsConfig);
 
-    m_server = Tase2_Server_create (m_model, nullptr);
+    if (m_config->TLSEnabled ())
+    {
+        m_config->importTlsConfig (tlsConfig);
+
+        bool success = createTLSConfiguration ();
+        if (!success)
+        {
+            Tase2Utility::log_error ("Failed to create TLS Configuration");
+        }
+    }
+
+    m_server = Tase2_Server_create (m_model, m_tlsConfig);
 
     for (const auto& blt : m_config->getBilateralTables ())
     {
@@ -840,4 +856,191 @@ TASE2Server::registerControl (
     m_oper = operation;
 
     Tase2Utility::log_warn ("RegisterControl is called"); // LCOV_EXCL_LINE
+}
+
+bool
+TASE2Server::createTLSConfiguration ()
+{
+    TLSConfiguration tlsConfig = TLSConfiguration_create ();
+
+    if (tlsConfig)
+    {
+        bool tlsConfigOk = true;
+
+        std::string certificateStore
+            = getDataDir () + std::string ("/etc/certs/");
+        std::string certificateStorePem
+            = getDataDir () + std::string ("/etc/certs/pem/");
+
+        if (m_config->GetOwnCertificate ().length () == 0
+            || m_config->GetPrivateKey ().length () == 0)
+        {
+            Tase2Utility::log_error (
+                "No private key and/or certificate configured for client");
+            tlsConfigOk = false;
+        }
+
+        if (m_config->GetOwnCertificate ().empty () == false)
+        {
+            std::string ownCert = m_config->GetOwnCertificate ();
+
+            bool isPemOwnCertificate
+                = ownCert.rfind (".pem") == ownCert.size () - 4;
+
+            std::string ownCertFile;
+
+            if (isPemOwnCertificate)
+                ownCertFile = certificateStorePem + ownCert;
+            else
+                ownCertFile = certificateStore + ownCert;
+
+            if (access (ownCertFile.c_str (), R_OK) == 0)
+            {
+
+                if (TLSConfiguration_setOwnCertificateFromFile (
+                        tlsConfig, ownCertFile.c_str ())
+                    == false)
+                {
+                    Tase2Utility::log_error (
+                        "Failed to load own certificate from file: %s",
+                        ownCertFile.c_str ());
+                    tlsConfigOk = false;
+                }
+            }
+            else
+            {
+                Tase2Utility::log_error (
+                    "Failed to access own certificate file: %s",
+                    ownCertFile.c_str ());
+                tlsConfigOk = false;
+            }
+        }
+
+        if (m_config->GetPrivateKey ().empty () == false)
+        {
+            std::string privateKeyFile
+                = certificateStore + m_config->GetPrivateKey ();
+
+            if (access (privateKeyFile.c_str (), R_OK) == 0)
+            {
+
+                if (TLSConfiguration_setOwnKeyFromFile (
+                        tlsConfig, privateKeyFile.c_str (), NULL)
+                    == false)
+                {
+                    Tase2Utility::log_error (
+                        "Failed to load private key from file: %s",
+                        privateKeyFile.c_str ());
+                    tlsConfigOk = false;
+                }
+            }
+            else
+            {
+                Tase2Utility::log_error (
+                    "Failed to access private key file: %s",
+                    privateKeyFile.c_str ());
+                tlsConfigOk = false;
+            }
+        }
+
+        if (m_config->GetRemoteCertificates ().size () > 0)
+        {
+            TLSConfiguration_setAllowOnlyKnownCertificates (tlsConfig, true);
+
+            for (std::string& remoteCert : m_config->GetRemoteCertificates ())
+            {
+                bool isPemRemoteCertificate
+                    = remoteCert.rfind (".pem") == remoteCert.size () - 4;
+
+                std::string remoteCertFile;
+
+                if (isPemRemoteCertificate)
+                    remoteCertFile = certificateStorePem + remoteCert;
+                else
+                    remoteCertFile = certificateStore + remoteCert;
+
+                if (access (remoteCertFile.c_str (), R_OK) == 0)
+                {
+                    if (TLSConfiguration_addAllowedCertificateFromFile (
+                            tlsConfig, remoteCertFile.c_str ())
+                        == false)
+                    {
+                        Tase2Utility::log_warn (
+                            "Failed to load remote certificate file: %s -> "
+                            "ignore certificate",
+                            remoteCertFile.c_str ());
+                    }
+                }
+                else
+                {
+                    Tase2Utility::log_warn (
+                        "Failed to access remote certificate file: %s -> "
+                        "ignore certificate",
+                        remoteCertFile.c_str ());
+                }
+            }
+        }
+        else
+        {
+            TLSConfiguration_setAllowOnlyKnownCertificates (tlsConfig, false);
+        }
+
+        if (m_config->GetCaCertificates ().size () > 0)
+        {
+            TLSConfiguration_setChainValidation (tlsConfig, true);
+
+            for (std::string& caCert : m_config->GetCaCertificates ())
+            {
+                bool isPemCaCertificate
+                    = caCert.rfind (".pem") == caCert.size () - 4;
+
+                std::string caCertFile;
+
+                if (isPemCaCertificate)
+                    caCertFile = certificateStorePem + caCert;
+                else
+                    caCertFile = certificateStore + caCert;
+
+                if (access (caCertFile.c_str (), R_OK) == 0)
+                {
+                    if (TLSConfiguration_addCACertificateFromFile (
+                            tlsConfig, caCertFile.c_str ())
+                        == false)
+                    {
+                        Tase2Utility::log_warn (
+                            "Failed to load CA certificate file: %s -> ignore "
+                            "certificate",
+                            caCertFile.c_str ());
+                    }
+                }
+                else
+                {
+                    Tase2Utility::log_warn (
+                        "Failed to access CA certificate file: %s -> ignore "
+                        "certificate",
+                        caCertFile.c_str ());
+                }
+            }
+        }
+        else
+        {
+            TLSConfiguration_setChainValidation (tlsConfig, false);
+        }
+
+        if (tlsConfigOk)
+        {
+            m_tlsConfig = tlsConfig;
+        }
+        else
+        {
+            TLSConfiguration_destroy (tlsConfig);
+            m_tlsConfig = nullptr;
+        }
+
+        return tlsConfigOk;
+    }
+    else
+    {
+        return false;
+    }
 }
