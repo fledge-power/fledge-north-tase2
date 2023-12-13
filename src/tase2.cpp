@@ -12,6 +12,21 @@
 #include <vector>
 
 static uint64_t
+getMonotonicTimeInMs ()
+{
+    uint64_t timeVal = 0;
+
+    struct timespec ts;
+
+    if (clock_gettime (CLOCK_MONOTONIC, &ts) == 0)
+    {
+        timeVal = ((uint64_t)ts.tv_sec * 1000LL) + (ts.tv_nsec / 1000000);
+    }
+
+    return timeVal;
+}
+
+static uint64_t
 GetCurrentTimeInMs ()
 {
     struct timeval now;
@@ -33,6 +48,12 @@ TASE2Server::~TASE2Server ()
     {
         m_monitoringThread->join ();
         delete m_monitoringThread;
+    }
+
+    if (m_connectionThread)
+    {
+        m_connectionThread->join ();
+        delete m_connectionThread;
     }
 
     removeAllOutstandingCommands ();
@@ -102,14 +123,16 @@ void
 TASE2Server::start ()
 {
     m_started = true;
+    m_connectionThread
+        = new std::thread (&TASE2Server::_connectionThread, this);
     m_monitoringThread
         = new std::thread (&TASE2Server::_monitoringThread, this);
 }
 
 void
-TASE2Server::_monitoringThread ()
+TASE2Server::_connectionThread ()
 {
-    Tase2Utility::log_debug ("Monitoring thread called");
+    Tase2Utility::log_debug ("Connection thread called");
 
     if (!m_server)
     {
@@ -125,7 +148,39 @@ TASE2Server::_monitoringThread ()
         Tase2_Server_setTcpPort (m_server, m_config->TcpPort ());
     }
 
+    m_lastConnCheck = getMonotonicTimeInMs ();
     Tase2_Endpoint_connect (m_endpoint);
+
+    while (m_started)
+    {
+        m_connectionLock.lock ();
+        if (getMonotonicTimeInMs () > m_lastConnCheck + m_connTimeout)
+        {
+            m_lastConnCheck = getMonotonicTimeInMs ();
+            if (!m_passive
+                && Tase2_Endpoint_getState (m_endpoint)
+                       != TASE2_ENDPOINT_STATE_CONNECTED)
+            {
+                Tase2Utility::log_warn ("Connection failed, trying again");
+
+                Tase2_Endpoint_connect (m_endpoint);
+            }
+        }
+        m_connectionLock.unlock ();
+        Thread_sleep (50);
+    }
+}
+
+void
+TASE2Server::_monitoringThread ()
+{
+    Tase2Utility::log_debug ("Monitoring thread called");
+
+    if (!m_server)
+    {
+        Tase2Utility::log_error ("No server, can't start");
+        return;
+    }
 
     while (m_started)
     {
@@ -153,16 +208,6 @@ TASE2Server::_monitoringThread ()
         }
 
         m_outstandingCommandsLock.unlock ();
-
-        if (!m_passive
-            && Tase2_Endpoint_getState (m_endpoint)
-                   != TASE2_ENDPOINT_STATE_CONNECTED)
-        {
-            Tase2Utility::log_warn ("Connection failed, trying again");
-            Tase2_Endpoint_connect (m_endpoint);
-        }
-
-        Thread_sleep (1000);
     }
 }
 
@@ -592,6 +637,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     dp->toJSONProperty ().c_str ());
                 continue;
             }
+            m_connectionLock.lock ();
             switch (dpType)
             {
             case REAL: {
@@ -603,6 +649,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_FLOAT for REAL",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -619,6 +666,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_FLOAT for REALQ",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -637,6 +686,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_FLOAT for REALQTIME",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -654,6 +705,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for STATE",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -671,6 +723,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for STATEQ",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -690,6 +744,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for STATEQTIME",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -709,6 +765,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for DISCRETE",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -725,6 +783,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for DISCRETEQ",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -743,6 +803,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for DISCRETEQTIMEEXT",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -760,6 +822,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for STATESUP",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -778,6 +842,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for STATESUPQ",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -798,6 +864,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "Skipping datapoint: %s, reason: value type is not "
                         "T_INTEGER for STATESUPQTIMEEXT",
                         dp->toJSONProperty ().c_str ());
+                    m_connectionLock.unlock ();
+
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -809,12 +877,14 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 break;
             }
             }
+            m_connectionLock.unlock ();
+
             delete value;
         }
         n++;
     }
 
-    return 0;
+    return n;
 }
 
 void

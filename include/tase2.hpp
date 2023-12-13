@@ -122,6 +122,9 @@ class TASE2Server
 
     std::string m_modelPath;
 
+    uint64_t m_lastConnCheck;
+    uint64_t m_connTimeout = 5000;
+
     bool m_started;
     std::string m_name;
     TASE2Config* m_config = nullptr;
@@ -131,6 +134,8 @@ class TASE2Server
     Tase2_Endpoint m_endpoint = nullptr;
 
     std::thread* m_monitoringThread = nullptr;
+    std::thread* m_connectionThread = nullptr;
+    std::mutex m_connectionLock;
 
     std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> >
         m_modelEntries;
@@ -141,6 +146,7 @@ class TASE2Server
 
     bool createTLSConfiguration ();
     void _monitoringThread ();
+    void _connectionThread ();
 
     void addToOutstandingCommands (const std::string& domain,
                                    const std::string& name, bool isSelect);
