@@ -29,6 +29,30 @@ class TASE2Config
                             Tase2_DataModel model);
     void importTlsConfig (const std::string& tlsConfig);
 
+    std::string
+    localAP ()
+    {
+        return m_localAP;
+    }
+
+    int
+    localAE ()
+    {
+        return m_localAe;
+    }
+
+    std::string
+    remoteAP ()
+    {
+        return m_remoteAP;
+    }
+
+    int
+    remoteAE ()
+    {
+        return m_remoteAe;
+    }
+
     int TcpPort ();
     bool
     bindOnIp ()
@@ -87,8 +111,20 @@ class TASE2Config
         return m_caCertificates;
     };
 
+    bool
+    Passive ()
+    {
+        return m_passive;
+    }
+
   private:
     static bool isValidIPAddress (const std::string& addrStr);
+
+    std::string m_remoteAP = "";
+    std::string m_localAP = "";
+
+    int m_localAe;
+    int m_remoteAe;
 
     std::string m_ip = "";
     int m_tcpPort = -1;
@@ -99,6 +135,8 @@ class TASE2Config
     bool m_bindOnIp;
     bool m_protocolConfigComplete = false;
     bool m_exchangeConfigComplete = false;
+
+    bool m_passive = true;
 
     std::unordered_map<
         std::string,

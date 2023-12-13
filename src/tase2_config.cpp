@@ -663,6 +663,85 @@ TASE2Config::importProtocolConfig (const std::string& protocolConfig)
             Tase2Utility::log_warn ("tls has invalid type -> not using TLS");
         }
     }
+
+    if (transportLayer.HasMember ("passive"))
+    {
+        if (transportLayer["passive"].IsBool ())
+        {
+            m_passive = transportLayer["passive"].GetBool ();
+        }
+        else
+        {
+            Tase2Utility::log_warn (
+                "passive has invalid type -> server is passive");
+        }
+    }
+
+    if (transportLayer.HasMember ("localApTitle"))
+    {
+        if (transportLayer["localApTitle"].IsString ())
+        {
+            std::string localApString
+                = transportLayer["localApTitle"].GetString ();
+
+            size_t colonPos = localApString.find (':');
+
+            if (colonPos == std::string::npos)
+            {
+                Tase2Utility::log_warn ("Invalid local AP Title %s",
+                                        localApString.c_str ());
+            }
+
+            m_localAP = localApString.substr (0, colonPos);
+
+            try
+            {
+                int localAe = std::stoi (localApString.substr (colonPos + 1));
+                m_localAe = localAe;
+                Tase2Utility::log_debug ("Using localApTitle address: %s\n",
+                                         m_localAP.c_str ());
+            }
+            catch (...)
+            {
+                Tase2Utility::log_warn ("Invalid local AP Title %s",
+                                        localApString.c_str ());
+            }
+        }
+    }
+
+    if (transportLayer.HasMember ("remoteApTitle"))
+    {
+        if (transportLayer["remoteApTitle"].IsString ())
+        {
+
+            std::string remoteApString
+                = transportLayer["remoteApTitle"].GetString ();
+
+            size_t colonPos = remoteApString.find (':');
+
+            if (colonPos == std::string::npos)
+            {
+                Tase2Utility::log_warn ("Invalid remote AP Title %s",
+                                        remoteApString.c_str ());
+            }
+
+            m_remoteAP = remoteApString.substr (0, colonPos);
+
+            try
+            {
+                int remoteAe
+                    = std::stoi (remoteApString.substr (colonPos + 1));
+                m_remoteAe = remoteAe;
+                Tase2Utility::log_debug ("Using remoteApTitle address: %s\n",
+                                         m_remoteAP.c_str ());
+            }
+            catch (...)
+            {
+                Tase2Utility::log_warn ("Invalid remote AP Title %s",
+                                        remoteApString.c_str ());
+            }
+        }
+    }
 }
 
 void
@@ -865,7 +944,7 @@ TASE2Config::ServerIp ()
 {
     if (m_ip == "")
     {
-        return "0.0.0.0";
+        return m_passive ? "0.0.0.0" : "127.0.0.1";
     }
     else
     {

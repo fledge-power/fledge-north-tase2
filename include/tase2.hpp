@@ -126,6 +126,10 @@ class TASE2Server
     std::string m_name;
     TASE2Config* m_config = nullptr;
 
+    bool m_passive = false;
+
+    Tase2_Endpoint m_endpoint = nullptr;
+
     std::thread* m_monitoringThread = nullptr;
 
     std::unordered_map<std::string, std::shared_ptr<TASE2Datapoint> >
@@ -162,6 +166,7 @@ class TASE2Server
     FRIEND_TEST (ControlTest, OutstandingCommandSuccess);
     FRIEND_TEST (ControlTest, OutstandingCommandFailure);
     FRIEND_TEST (DatasetTest, CreateDatasetAndUpdate);
+    FRIEND_TEST (ConnectionHandlerTest, NormalConnectionActive);
     friend class DatasetTest;
 };
 

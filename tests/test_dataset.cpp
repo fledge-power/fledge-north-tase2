@@ -52,9 +52,15 @@ static const char* default_config = QUOTE ({
         "order" : "2",
         "default" : QUOTE ({
             "protocol_stack" : {
-                "name" : "tase2",
+                "name" : "tase2north",
                 "version" : "1.0",
-                "transport_layer" : { "srv_ip" : "0.0.0.0", "port" : 10002 }
+                "transport_layer" : {
+                    "srv_ip" : "0.0.0.0",
+                    "port" : 10002,
+                    "passive" : true,
+                    "localApTitle" : "1.1.1.999:12",
+                    "remoteApTitle" : "1.1.1.998:12"
+                }
             }
         })
     },
@@ -475,6 +481,8 @@ static const char* default_config = QUOTE ({
 });
 
 static int dataSetCreated = 0;
+static int dsValueHandlerCalled = 0;
+static Tase2_PointValue lastPointValue = nullptr;
 
 // Class to be called in each test, contains fixture to be used in
 class DatasetTest : public testing::Test
@@ -486,7 +494,8 @@ class DatasetTest : public testing::Test
     SetUp () override
     {
         dataSetCreated = 0;
-        // Init tase2server object
+        dsValueHandlerCalled = 0;
+        lastPointValue = nullptr;
     }
 
     // TearDown is ran for every tests, so each variable are destroyed
@@ -494,6 +503,10 @@ class DatasetTest : public testing::Test
     void
     TearDown () override
     {
+        if (lastPointValue)
+        {
+            Tase2_PointValue_destroy (lastPointValue);
+        }
         plugin_shutdown (handle);
     }
 
@@ -521,7 +534,10 @@ class DatasetTest : public testing::Test
                                const char* domainName, const char* pointName,
                                Tase2_PointValue pointValue)
     {
-        printf ("  Received value for %s:%s\n", domainName, pointName);
+        dsValueHandlerCalled++;
+        lastPointValue = Tase2_PointValue_getCopy (pointValue);
+
+        printf ("  Received value for %s:%s \n", domainName, pointName);
     }
 
     static void
@@ -774,6 +790,10 @@ class DatasetTest : public testing::Test
         Tase2_Client_setLocalApTitle (client, "1.1.1.998", 12);
         Tase2_Client_setRemoteApTitle (client, "1.1.1.999", 12);
         Tase2_Client_setTcpPort (client, TCP_TEST_PORT);
+        Tase2_Client_installDSTransferSetValueHandler (
+            client, dsTransferSetValueHandler, NULL);
+        Tase2_Client_installDSTransferSetReportHandler (
+            client, dsTransferSetReportHandler, NULL);
         Tase2_Client_connect (client, "localhost", "1.1.1.999", 12);
     }
 };
@@ -824,9 +844,24 @@ TEST_F (DatasetTest, ActivateDataTransferSet)
     Tase2_ClientDSTransferSet dsts
         = Tase2_Client_getNextDSTransferSet (client, "icc1", &err);
 
-    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
+    ASSERT_EQ (Tase2_ClientDataSet_read (dataSet, client),
+               TASE2_CLIENT_ERROR_OK);
 
     Tase2_ClientDSTransferSet_setDataSet (dsts, dataSet);
+    Tase2_ClientDSTransferSet_setDataSetName (dsts, "icc1", "ds1");
+    Tase2_ClientDSTransferSet_setInterval (dsts, 5);
+    Tase2_ClientDSTransferSet_setTLE (dsts, 60);
+    Tase2_ClientDSTransferSet_setBufferTime (dsts, 2);
+    Tase2_ClientDSTransferSet_setIntegrityCheck (dsts, 30);
+    Tase2_ClientDSTransferSet_setRBE (dsts, true);
+    Tase2_ClientDSTransferSet_setCritical (dsts, false);
+    Tase2_ClientDSTransferSet_setDSConditionsRequested (
+        dsts, TASE2_DS_CONDITION_INTERVAL | TASE2_DS_CONDITION_CHANGE);
+    Tase2_ClientDSTransferSet_setStatus (dsts, true);
+
+    printf ("Start DSTransferSet\n");
+    ASSERT_EQ (Tase2_ClientDSTransferSet_writeValues (dsts, client),
+               TASE2_CLIENT_ERROR_OK);
 
     ASSERT_EQ (Tase2_ClientDSTransferSet_readValues (dsts, client),
                TASE2_CLIENT_ERROR_OK);
@@ -842,11 +877,26 @@ TEST_F (DatasetTest, ActivateDataTransferSet)
     delete dataobjects;
     delete reading;
 
-    Tase2_ClientDataSet_destroy (dataSet);
+    auto start = std::chrono::high_resolution_clock::now ();
+    auto timeout = std::chrono::seconds (10);
+    while (dsValueHandlerCalled <= 0)
+    {
+        auto now = std::chrono::high_resolution_clock::now ();
+        if (now - start > timeout)
+        {
+            FAIL () << "Connection not established within timeout";
+            Tase2_ClientDataSet_destroy (dataSet);
+            Tase2_ClientDSTransferSet_destroy (dsts);
+            Tase2_Client_destroy (client);
 
-    // ASSERT_EQ (Tase2_PointValue_getValueReal (
-    //                Tase2_ClientDataSet_getPointValue (dataSet, 0)),
-    //            1.2f);
+            break;
+        }
+        Thread_sleep (10);
+    }
+
+    ASSERT_NEAR (Tase2_PointValue_getValueReal (lastPointValue), 1.2, 0.00001);
+
+    Tase2_ClientDataSet_destroy (dataSet);
 
     Tase2_ClientDSTransferSet_destroy (dsts);
 

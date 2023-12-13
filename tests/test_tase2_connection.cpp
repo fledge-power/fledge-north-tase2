@@ -11,7 +11,13 @@ static string protocol_stack = QUOTE ({
     "protocol_stack" : {
         "name" : "tase2north",
         "version" : "1.0",
-        "transport_layer" : { "srv_ip" : "0.0.0.0", "port" : 10002 }
+        "transport_layer" : {
+            "srv_ip" : "0.0.0.0",
+            "port" : 10002,
+            "passive" : true,
+            "localApTitle" : "1.1.1.999:12",
+            "remoteApTitle" : "1.1.1.998:12"
+        }
     }
 });
 
@@ -19,8 +25,29 @@ static string protocol_stack_tls = QUOTE ({
     "protocol_stack" : {
         "name" : "tase2north",
         "version" : "1.0",
-        "transport_layer" :
-            { "srv_ip" : "0.0.0.0", "port" : 10002, "tls" : true }
+        "transport_layer" : {
+            "srv_ip" : "0.0.0.0",
+            "port" : 10002,
+            "passive" : true,
+            "localApTitle" : "1.1.1.999:12",
+            "remoteApTitle" : "1.1.1.998:12",
+            "tls" : true
+        }
+    }
+});
+
+static string protocol_stack_active = QUOTE ({
+    "protocol_stack" : {
+        "name" : "tase2north",
+        "version" : "1.0",
+        "transport_layer" : {
+            "srv_ip" : "0.0.0.0",
+            "port" : 10002,
+            "passive" : false,
+            "localApTitle" : "1.1.1.999:12",
+            "remoteApTitle" : "1.1.1.998:12",
+            "remote_ip" : "127.0.0.1"
+        }
     }
 });
 
@@ -31,10 +58,7 @@ static string tls = QUOTE ({
     "tls_conf" : {
         "private_key" : "tase2_server.key",
         "own_cert" : "tase2_server.cer",
-        "ca_certs" : [
-            { "cert_file" : "tase2_ca.cer" },
-            { "cert_file" : "tase2_ca2.cer" }
-        ],
+        "ca_certs" : [ { "cert_file" : "tase2_ca.cer" } ],
         "remote_certs" : [ { "cert_file" : "tase2_client.cer" } ]
     }
 });
@@ -205,7 +229,7 @@ class ConnectionHandlerTest : public testing::Test
     }
 };
 
-TEST_F (ConnectionHandlerTest, NormalConnection)
+TEST_F (ConnectionHandlerTest, NormalConnectionPassive)
 {
     tase2Server->setJsonConfig (protocol_stack, exchanged_data, "",
                                 model_config);
@@ -227,6 +251,37 @@ TEST_F (ConnectionHandlerTest, NormalConnection)
     ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
 
     Tase2_Client_destroy (client);
+}
+
+TEST_F (ConnectionHandlerTest, NormalConnectionActive)
+{
+    tase2Server->setJsonConfig (protocol_stack_active, exchanged_data, "",
+                                model_config);
+
+    Tase2_Endpoint endpoint = Tase2_Endpoint_create (nullptr, true);
+
+    Tase2_Endpoint_setLocalIpAddress (endpoint, "0.0.0.0");
+    Tase2_Endpoint_setLocalTcpPort (endpoint, 10002);
+    Tase2_Endpoint_setLocalApTitle (endpoint, "1.1.1.998", 12);
+    Tase2_Endpoint_setRemoteApTitle (endpoint, "1.1.1.999", 12);
+
+    Tase2_Client client = Tase2_Client_createEx (endpoint);
+    Thread_sleep (100);
+
+    Tase2_Endpoint_connect (endpoint);
+
+    ASSERT_TRUE (Tase2_Endpoint_getState (endpoint)
+                 == TASE2_ENDPOINT_STATE_LISTENING);
+
+    tase2Server->start ();
+
+    Thread_sleep (1500);
+
+    ASSERT_TRUE (Tase2_Endpoint_getState (tase2Server->m_endpoint)
+                 == TASE2_ENDPOINT_STATE_CONNECTED);
+
+    Tase2_Client_destroy (client);
+    Tase2_Endpoint_destroy (endpoint);
 }
 
 TEST_F (ConnectionHandlerTest, NormalConnectionTLS)

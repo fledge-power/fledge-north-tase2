@@ -56,6 +56,8 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
     m_config->importExchangeConfig (dataExchangeConfig, m_model);
     m_config->importProtocolConfig (stackConfig);
 
+    m_passive = m_config->Passive ();
+
     if (m_config->TLSEnabled ())
     {
         m_config->importTlsConfig (tlsConfig);
@@ -67,7 +69,22 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
         }
     }
 
-    m_server = Tase2_Server_create (m_model, m_tlsConfig);
+    m_endpoint = Tase2_Endpoint_create (m_tlsConfig, m_passive);
+
+    if (!m_passive)
+    {
+        Tase2_Endpoint_setRemoteIpAddress (m_endpoint,
+                                           m_config->ServerIp ().c_str ());
+        Tase2_Endpoint_setRemoteApTitle (
+            m_endpoint, m_config->remoteAP ().c_str (), m_config->remoteAE ());
+
+        Tase2_Endpoint_setRemoteTcpPort (m_endpoint, m_config->TcpPort ());
+    }
+
+    Tase2_Endpoint_setLocalApTitle (m_endpoint, m_config->localAP ().c_str (),
+                                    m_config->localAE ());
+
+    m_server = Tase2_Server_createEx (m_model, m_endpoint);
 
     for (const auto& blt : m_config->getBilateralTables ())
     {
@@ -99,11 +116,16 @@ TASE2Server::_monitoringThread ()
         Tase2Utility::log_error ("No server, can't start");
         return;
     }
-    Tase2_Server_setLocalIpAddress (m_server, m_config->ServerIp ().c_str ());
 
-    Tase2_Server_setTcpPort (m_server, m_config->TcpPort ());
+    if (m_passive)
+    {
+        Tase2_Server_setLocalIpAddress (m_server,
+                                        m_config->ServerIp ().c_str ());
 
-    Tase2_Server_start (m_server);
+        Tase2_Server_setTcpPort (m_server, m_config->TcpPort ());
+    }
+
+    Tase2_Endpoint_connect (m_endpoint);
 
     while (m_started)
     {
@@ -132,7 +154,15 @@ TASE2Server::_monitoringThread ()
 
         m_outstandingCommandsLock.unlock ();
 
-        Thread_sleep (100);
+        if (!m_passive
+            && Tase2_Endpoint_getState (m_endpoint)
+                   != TASE2_ENDPOINT_STATE_CONNECTED)
+        {
+            Tase2Utility::log_warn ("Connection failed, trying again");
+            Tase2_Endpoint_connect (m_endpoint);
+        }
+
+        Thread_sleep (1000);
     }
 }
 
@@ -179,6 +209,10 @@ TASE2Server::stop ()
     if (m_server)
     {
         Tase2_Server_destroy (m_server);
+    }
+    if (m_endpoint)
+    {
+        Tase2_Endpoint_destroy (m_endpoint);
     }
 }
 

@@ -51,12 +51,18 @@ static const char* default_config = QUOTE ({
         "displayName" : "Protocol stack parameters",
         "order" : "2",
         "default" : QUOTE ({
-            "protocol_stack" : {
-                "name" : "tase2",
-                "version" : "1.0",
-                "transport_layer" : { "srv_ip" : "0.0.0.0", "port" : 10002 }
-            }
-        })
+    "protocol_stack" : {
+        "name" : "tase2north",
+        "version" : "1.0",
+        "transport_layer" : {
+            "srv_ip" : "0.0.0.0",
+            "port" : 10002,
+            "passive" : true,
+            "localApTitle" : "1.1.1.999:12",
+            "remoteApTitle" : "1.1.1.998:12"
+        }
+    }
+})
     },
     "model_conf" : {
         "description" : "Tase2 Data Model configuration",

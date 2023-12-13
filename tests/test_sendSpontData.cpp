@@ -52,9 +52,15 @@ static const char* default_config = QUOTE ({
         "order" : "2",
         "default" : QUOTE ({
             "protocol_stack" : {
-                "name" : "tase2",
+                "name" : "tase2north",
                 "version" : "1.0",
-                "transport_layer" : { "srv_ip" : "0.0.0.0", "port" : 10002 }
+                "transport_layer" : {
+                    "srv_ip" : "0.0.0.0",
+                    "port" : 10002,
+                    "passive" : true,
+                    "localApTitle" : "1.1.1.999:12",
+                    "remoteApTitle" : "1.1.1.998:12"
+                }
             }
         })
     },
