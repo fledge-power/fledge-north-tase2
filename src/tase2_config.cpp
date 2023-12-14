@@ -116,8 +116,6 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
             TASE2Datapoint::getDpTypeFromString (
                 datapoint["type"].GetString ()));
 
-        m_modelEntries["vcc"].insert ({ t2dp->getLabel (), t2dp });
-
         if (TASE2Datapoint::isCommand (t2dp->getType ()))
         {
             if (!datapoint.HasMember ("mode")
@@ -178,6 +176,11 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                 vcc, t2dp->getLabel ().c_str (), indType, qClass, tsClass,
                 hasCOV, true));
         }
+        m_modelEntries["vcc"][t2dp->getLabel ()] = t2dp;
+
+        Tase2Utility::log_debug (
+            "Add datapoint %s to vcc, %d datapoints present",
+            t2dp->getLabel ().c_str (), m_modelEntries.size ());
     }
 
     if (!modelConf.HasMember ("icc") || !modelConf["icc"].IsArray ())

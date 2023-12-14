@@ -208,6 +208,7 @@ TASE2Server::_monitoringThread ()
         }
 
         m_outstandingCommandsLock.unlock ();
+        Thread_sleep (50);
     }
 }
 
@@ -1047,7 +1048,7 @@ TASE2Server::createTLSConfiguration ()
             }
         }
 
-        if (m_config->GetRemoteCertificates ().size () > 0)
+        if (!m_config->GetRemoteCertificates ().empty ())
         {
             TLSConfiguration_setAllowOnlyKnownCertificates (tlsConfig, true);
 
