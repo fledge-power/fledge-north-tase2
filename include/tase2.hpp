@@ -153,6 +153,11 @@ class TASE2Server
 
     void removeAllOutstandingCommands ();
 
+    static void clientConnectionHandler (void* parameter,
+                                         const char* clientAddress,
+                                         Tase2_BilateralTable clientBlt,
+                                         bool connect);
+
     static Tase2_HandlerResult selectHandler (void* parameter,
                                               Tase2_ControlPoint controlPoint);
 

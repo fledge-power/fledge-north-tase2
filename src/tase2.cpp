@@ -117,6 +117,8 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
     Tase2_Server_setOperateHandler (m_server, operateHandler, this);
     Tase2_Server_setSelectHandler (m_server, selectHandler, this);
     Tase2_Server_setSetTagHandler (m_server, setTagHandler, this);
+    Tase2_Server_setClientConnectionHandler (m_server, clientConnectionHandler,
+                                             nullptr);
 }
 
 void
@@ -261,6 +263,29 @@ TASE2Server::stop ()
     if (m_endpoint)
     {
         Tase2_Endpoint_destroy (m_endpoint);
+    }
+}
+
+void
+TASE2Server::clientConnectionHandler (void* parameter,
+                                      const char* clientAddress,
+                                      Tase2_BilateralTable clientBlt,
+                                      bool connect)
+{
+    if (connect)
+    {
+        Tase2Utility::log_info ("Client from %s connected\n", clientAddress);
+    }
+    else
+    {
+        Tase2Utility::log_info ("Client from %s disconnected\n",
+                                clientAddress);
+    }
+
+    if (clientBlt)
+    {
+        Tase2Utility::log_debug ("client BLT: %s\n",
+                                 Tase2_BilateralTable_getID (clientBlt));
     }
 }
 
