@@ -14,7 +14,7 @@ project(tase2)
 
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 
-if (${CMAKE_BUILD_TYPE} STREQUAL Coverage)
+if (CMAKE_BUILD_TYPE STREQUAL Coverage)
   message("Coverage is going to be generated")
   enable_testing()
   add_subdirectory(tests)
