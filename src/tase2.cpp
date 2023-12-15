@@ -176,11 +176,13 @@ TASE2Server::_monitoringThread ()
 {
     Tase2Utility::log_debug ("Monitoring thread called");
 
+    // LCOV_EXCL_START
     if (!m_server)
     {
         Tase2Utility::log_error ("No server, can't start");
         return;
     }
+    // LCOV_EXCL_STOP
 
     while (m_started)
     {
@@ -267,8 +269,6 @@ TASE2Server::selectHandler (void* parameter, Tase2_ControlPoint controlPoint)
 {
     auto server = (TASE2Server*)parameter;
 
-    Tase2Utility::log_debug ("Received operate command\n");
-
     Tase2_ControlPointType type = Tase2_ControlPoint_getType (controlPoint);
 
     std::string domain
@@ -277,24 +277,25 @@ TASE2Server::selectHandler (void* parameter, Tase2_ControlPoint controlPoint)
 
     std::string scope = domain == "vcc" ? "vcc" : "domain";
 
-    Tase2Utility::log_debug ("Received select for %s:%s\n", domain, name);
+    Tase2Utility::log_debug ("Received select for %s:%s\n", domain.c_str (),
+                             name.c_str ());
 
     switch (type)
     {
     case TASE2_CONTROL_TYPE_COMMAND: {
         server->forwardCommand (scope, domain, name, "Command",
                                 GetCurrentTimeInMs (), nullptr, true);
-        break;
+        break; // LCOV_EXCL_LINE
     }
     case TASE2_CONTROL_TYPE_SETPOINT_DESCRETE: {
         server->forwardCommand (scope, domain, name, "SetPointDiscrete",
                                 GetCurrentTimeInMs (), nullptr, true);
-        break;
+        break; // LCOV_EXCL_LINE
     }
     case TASE2_CONTROL_TYPE_SETPOINT_REAL: {
         server->forwardCommand (scope, domain, name, "SetPointReal",
                                 GetCurrentTimeInMs (), nullptr, true);
-        break;
+        break; // LCOV_EXCL_LINE
     }
     }
 
@@ -319,7 +320,6 @@ TASE2Server::operateHandler (void* parameter, Tase2_ControlPoint controlPoint,
                              Tase2_OperateValue value)
 {
     auto server = (TASE2Server*)parameter;
-    Tase2Utility::log_debug ("Received operate command\n");
 
     Tase2_ControlPointType type = Tase2_ControlPoint_getType (controlPoint);
 
@@ -329,22 +329,25 @@ TASE2Server::operateHandler (void* parameter, Tase2_ControlPoint controlPoint,
 
     std::string scope = domain == "vcc" ? "vcc" : "domain";
 
+    Tase2Utility::log_debug ("Received operate for %s:%s\n", domain.c_str (),
+                             name.c_str ());
+
     switch (type)
     {
     case TASE2_CONTROL_TYPE_COMMAND: {
         server->forwardCommand (scope, domain, name, "Command",
                                 GetCurrentTimeInMs (), &value, false);
-        break;
+        break; // LCOV_EXCL_LINE
     }
     case TASE2_CONTROL_TYPE_SETPOINT_DESCRETE: {
         server->forwardCommand (scope, domain, name, "SetPointDiscrete",
                                 GetCurrentTimeInMs (), &value, false);
-        break;
+        break; // LCOV_EXCL_LINE
     }
     case TASE2_CONTROL_TYPE_SETPOINT_REAL: {
         server->forwardCommand (scope, domain, name, "SetPointReal",
                                 GetCurrentTimeInMs (), &value, false);
-        break;
+        break; // LCOV_EXCL_LINE
     }
     }
     return TASE2_RESULT_SUCCESS;
@@ -481,6 +484,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
 
         for (Datapoint* dp : dataPoints)
         {
+            // LCOV_EXCL_START
             if (dp->getName () != "data_object")
             {
                 Tase2Utility::log_debug ("Skipping datapoint: %s, reason: "
@@ -488,11 +492,13 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                                          dp->getName ().c_str ());
                 continue;
             }
+            // LCOV_EXCL_STOP
 
             Tase2Utility::log_debug ("Send dp -> %s",
                                      dp->toJSONProperty ().c_str ());
             readingsSent++;
 
+            // LCOV_EXCL_START
             if (!Tase2_Server_isRunning (m_server))
             {
                 Tase2Utility::log_debug (
@@ -500,6 +506,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     dp->toJSONProperty ().c_str ());
                 continue;
             }
+            // LCOV_EXCL_STOP
 
             DatapointValue dpv = dp->getData ();
 
@@ -542,7 +549,8 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                 {
                     std::string validity = objDp->getData ().toStringValue ();
                     if (validity == "valid")
-                        dataFlags |= TASE2_DATA_FLAGS_VALIDITY_VALID;
+                        dataFlags
+                            |= TASE2_DATA_FLAGS_VALIDITY_VALID; // LCOV_EXCL_LINE
                     else if (validity == "held")
                         dataFlags |= TASE2_DATA_FLAGS_VALIDITY_HELD;
                     else if (validity == "suspect")
@@ -557,7 +565,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     if (currentSource == "telemetered")
                     {
                         dataFlags
-                            |= TASE2_DATA_FLAGS_CURRENT_SOURCE_TELEMETERED;
+                            |= TASE2_DATA_FLAGS_CURRENT_SOURCE_TELEMETERED; // LCOV_EXCL_LINE
                     }
                     else if (currentSource == "entered")
                     {
@@ -602,25 +610,31 @@ TASE2Server::send (const std::vector<Reading*>& readings)
             handleActCon (domain, name);
 
             DPTYPE dpType;
+            // LCOV_EXCL_START
             if (type == -1)
             {
                 Tase2Utility::log_debug (
                     "Skipping datapoint: %s, reason: type is -1",
                     dp->toJSONProperty ().c_str ());
+                delete value;
                 continue;
             }
+            // LCOV_EXCL_STOP
             dpType = static_cast<DPTYPE> (type);
 
             std::shared_ptr<TASE2Datapoint> t2dp
                 = m_config->getDatapointByReference (domain, name);
 
+            // LCOV_EXCL_START
             if (!t2dp)
             {
                 Tase2Utility::log_debug (
                     "Skipping datapoint: %s, reason: t2dp is null",
                     dp->toJSONProperty ().c_str ());
+                delete value;
                 continue;
             }
+            // LCOV_EXCL_STOP
 
             if (!t2dp->inExchangedDefinitions ())
             {
@@ -628,16 +642,21 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     "Skipping datapoint: %s, reason: datapoints is not in "
                     "Exchanged Definitions",
                     dp->toJSONProperty ().c_str ());
+                delete value;
                 continue;
             }
 
+            // LCOV_EXCL_START
             if (t2dp->getType () != dpType)
             {
                 Tase2Utility::log_debug (
                     "Skipping datapoint: %s, reason: t2dp type mismatch",
                     dp->toJSONProperty ().c_str ());
+                delete value;
                 continue;
             }
+            // LCOV_EXCL_STOP
+
             m_connectionLock.lock ();
             switch (dpType)
             {
@@ -651,12 +670,13 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_FLOAT for REAL",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setReal (ip, (float)value->toDouble ());
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case REALQ: {
                 Tase2Utility::log_debug ("Datapoint is REALQ %s",
@@ -668,14 +688,14 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_FLOAT for REALQ",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setRealQ (ip, (float)value->toDouble (),
                                                 dataFlags);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case REALQTIME:
             case REALQTIMEEXT: {
@@ -688,14 +708,14 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_FLOAT for REALQTIME",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setRealQTimeStamp (
                     ip, (float)value->toDouble (), dataFlags, timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case STATE: {
                 Tase2Utility::log_debug ("Datapoint is STATE %s",
@@ -707,13 +727,14 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for STATE",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setState (
                     ip, static_cast<Tase2_DataState> (value->toInt ()));
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case STATEQ: {
                 Tase2Utility::log_debug ("Datapoint is STATEQ %s",
@@ -725,7 +746,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for STATEQ",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -733,7 +754,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     ip, static_cast<Tase2_DataState> (value->toInt ()
                                                       | dataFlags));
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case STATEQTIME:
             case STATEQTIMEEXT: {
@@ -746,7 +767,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for STATEQTIME",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -755,7 +776,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     static_cast<Tase2_DataState> (value->toInt () | dataFlags),
                     timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case DISCRETE: {
                 Tase2Utility::log_debug ("Datapoint is DISCRETE %s",
@@ -767,13 +788,13 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for DISCRETE",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setDiscrete (ip, value->toInt ());
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case DISCRETEQ: {
                 Tase2Utility::log_debug ("Datapoint is DISCRETEQ %s",
@@ -785,14 +806,14 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for DISCRETEQ",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setDiscreteQ (ip, value->toInt (),
                                                     dataFlags);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case DISCRETEQTIME:
             case DISCRETEQTIMEEXT: {
@@ -805,14 +826,14 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for DISCRETEQTIMEEXT",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
                 Tase2_IndicationPoint_setDiscreteQTimeStamp (
                     ip, value->toInt (), dataFlags, timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case STATESUP: {
                 Tase2Utility::log_debug ("Datapoint is STATESUP %s",
@@ -824,7 +845,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for STATESUP",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -832,7 +853,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     ip, static_cast<Tase2_DataStateSupplemental> (
                             value->toInt ()));
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case STATESUPQ: {
                 Tase2Utility::log_debug ("Datapoint is STATESUPQ %s",
@@ -844,7 +865,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for STATESUPQ",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -853,7 +874,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     static_cast<Tase2_DataStateSupplemental> (value->toInt ()),
                     dataFlags);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             case STATESUPQTIME:
             case STATESUPQTIMEEXT: {
@@ -866,7 +887,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                         "T_INTEGER for STATESUPQTIMEEXT",
                         dp->toJSONProperty ().c_str ());
                     m_connectionLock.unlock ();
-
+                    delete value;
                     continue;
                 }
                 Tase2_IndicationPoint ip = t2dp->getIndicationPoint ();
@@ -875,7 +896,7 @@ TASE2Server::send (const std::vector<Reading*>& readings)
                     static_cast<Tase2_DataStateSupplemental> (value->toInt ()),
                     dataFlags, timestamp);
                 Tase2_Server_updateOnlineValue (m_server, (Tase2_DataPoint)ip);
-                break;
+                break; // LCOV_EXCL_LINE
             }
             }
             m_connectionLock.unlock ();

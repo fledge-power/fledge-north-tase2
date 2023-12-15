@@ -275,7 +275,9 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
                 }
 
                 auto deviceClass = static_cast<Tase2_DeviceClass> (
-                    datapoint["mode"].GetString () != "sbo");
+                    strcmp (datapoint["mode"].GetString (), "sbo") != 0);
+
+                Tase2Utility::log_debug ("Device class is %d", deviceClass);
 
                 bool hasTag = datapoint["hasTag"].GetBool ();
 

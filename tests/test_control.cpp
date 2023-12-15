@@ -51,18 +51,18 @@ static const char* default_config = QUOTE ({
         "displayName" : "Protocol stack parameters",
         "order" : "2",
         "default" : QUOTE ({
-    "protocol_stack" : {
-        "name" : "tase2north",
-        "version" : "1.0",
-        "transport_layer" : {
-            "srv_ip" : "0.0.0.0",
-            "port" : 10002,
-            "passive" : true,
-            "localApTitle" : "1.1.1.999:12",
-            "remoteApTitle" : "1.1.1.998:12"
-        }
-    }
-})
+            "protocol_stack" : {
+                "name" : "tase2north",
+                "version" : "1.0",
+                "transport_layer" : {
+                    "srv_ip" : "0.0.0.0",
+                    "port" : 10002,
+                    "passive" : true,
+                    "localApTitle" : "1.1.1.999:12",
+                    "remoteApTitle" : "1.1.1.998:12"
+                }
+            }
+        })
     },
     "model_conf" : {
         "description" : "Tase2 Data Model configuration",
@@ -104,6 +104,27 @@ static const char* default_config = QUOTE ({
                             "mode" : "direct",
                             "hasTag" : false,
                             "checkBackId" : 125
+                        },
+                        {
+                            "name" : "command2",
+                            "type" : "Command",
+                            "mode" : "sbo",
+                            "hasTag" : false,
+                            "checkBackId" : 126
+                        },
+                        {
+                            "name" : "commandNotInExchange",
+                            "type" : "Command",
+                            "mode" : "direct",
+                            "hasTag" : false,
+                            "checkBackId" : 126
+                        },
+                        {
+                            "name" : "commandTag",
+                            "type" : "Command",
+                            "mode" : "sbo",
+                            "hasTag" : true,
+                            "checkBackId" : 135
                         }
                     ]
                 },
@@ -140,6 +161,27 @@ static const char* default_config = QUOTE ({
                             "mode" : "direct",
                             "hasTag" : false,
                             "checkBackId" : 125
+                        },
+                        {
+                            "name" : "command2",
+                            "type" : "Command",
+                            "mode" : "sbo",
+                            "hasTag" : false,
+                            "checkBackId" : 126
+                        },
+                        {
+                            "name" : "commandNotInExchange",
+                            "type" : "Command",
+                            "mode" : "direct",
+                            "hasTag" : false,
+                            "checkBackId" : 126
+                        },
+                        {
+                            "name" : "commandTag",
+                            "type" : "Command",
+                            "mode" : "sbo",
+                            "hasTag" : true,
+                            "checkBackId" : 135
                         }
                     ]
                 } ],
@@ -154,7 +196,8 @@ static const char* default_config = QUOTE ({
                             { "name" : "datapointDiscrete" },
                             { "name" : "command1" },
                             { "name" : "setpointDiscrete1" },
-                            { "name" : "setpointReal1" }
+                            { "name" : "setpointReal1" },
+                            { "name" : "command2" }
                         ]
                     },
                     {
@@ -167,7 +210,10 @@ static const char* default_config = QUOTE ({
                             { "name" : "datapointDiscrete" },
                             { "name" : "command1" },
                             { "name" : "setpointDiscrete1" },
-                            { "name" : "setpointReal1" }
+                            { "name" : "setpointReal1" },
+                            { "name" : "command2" },
+                            { "name" : "commandNotInExchange" },
+                            { "name" : "commandTag" }
                         ]
                     }
                 ]
@@ -216,6 +262,18 @@ static const char* default_config = QUOTE ({
                         "protocols" : [
                             { "name" : "tase2", "ref" : "icc1:setpointReal1" }
                         ]
+                    },
+                    {
+                        "pivot_id" : "TC4",
+                        "label" : "TC4",
+                        "protocols" :
+                            [ { "name" : "tase2", "ref" : "icc1:command2" } ]
+                    },
+                    {
+                        "pivot_id" : "TC5",
+                        "label" : "TC5",
+                        "protocols" :
+                            [ { "name" : "tase2", "ref" : "icc1:commandTag" } ]
                     }
                 ]
             }
@@ -249,6 +307,17 @@ static int
 operateHandler (char* operation, int paramCount, char* names[],
                 char* parameters[], ControlDestination destination, ...)
 {
+    if (receivedParameters != nullptr)
+    {
+        for (int i = 0; receivedParameters[i] != nullptr; i++)
+        {
+            delete[] receivedParameters[i];
+        }
+
+        delete[] receivedParameters;
+
+        receivedParameters = nullptr;
+    }
     operateHandlerCalled++;
 
     receivedParameters = new char*[paramCount + 1];
@@ -505,6 +574,92 @@ TEST_F (ControlTest, SimpleCommand)
     Tase2_Client_destroy (client);
 }
 
+TEST_F (ControlTest, SimpleCommandSBO)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+
+    Tase2_ClientError err
+        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+    int checkbackId
+        = Tase2_Client_selectDevice (client, &err, "icc1", "command2");
+
+    ASSERT_EQ (126, checkbackId);
+
+    Thread_sleep (1000);
+    Tase2_Client_sendCommand (client, &err, "icc1", "command2", 1);
+
+    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
+
+    ASSERT_EQ (operateHandlerCalled, 2);
+
+    ASSERT_EQ (strcmp (receivedParameters[0], "Command"), 0);
+    ASSERT_EQ (strcmp (receivedParameters[1], "domain"), 0);
+    ASSERT_EQ (strcmp (receivedParameters[2], "icc1"), 0);
+    ASSERT_EQ (strcmp (receivedParameters[3], "command2"), 0);
+    ASSERT_EQ (strcmp (receivedParameters[4], "1"), 0);
+    ASSERT_EQ (strcmp (receivedParameters[5], "0"), 0);
+    ASSERT_NE (strcmp (receivedParameters[6], ""), 0);
+
+    Tase2_Client_destroy (client);
+}
+
+TEST_F (ControlTest, SimpleCommandSBONoSelect)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+
+    Tase2_ClientError err
+        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+    Tase2_Client_sendCommand (client, &err, "icc1", "command2", 1);
+
+    ASSERT_NE (err, TASE2_CLIENT_ERROR_OK);
+
+    ASSERT_EQ (operateHandlerCalled, 0);
+
+    Tase2_Client_destroy (client);
+}
+
+TEST_F (ControlTest, SimpleCommandSBOTag)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+
+    Tase2_ClientError err
+        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+    Tase2_Client_setTag (client, &err, "icc1", "commandTag",
+                         TASE2_TAG_OPEN_AND_CLOSE_INHIBIT, "Yes");
+
+    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
+
+    bool isArmed = false;
+
+    Tase2_TagValue tagValue = Tase2_Client_getTag (
+        client, &err, "icc1", "commandTag", &isArmed, NULL, 0);
+
+    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
+    ASSERT_EQ (TASE2_TAG_OPEN_AND_CLOSE_INHIBIT, tagValue);
+
+    int checkbackId
+        = Tase2_Client_selectDevice (client, &err, "icc1", "commandTag");
+
+    ASSERT_TRUE (err != TASE2_CLIENT_ERROR_OK);
+
+    Tase2_Client_destroy (client);
+}
+
 TEST_F (ControlTest, SetpointDiscrete)
 {
     ConfigCategory config;
@@ -643,6 +798,26 @@ TEST_F (ControlTest, OutstandingCommandFailure)
     Thread_sleep (6000);
 
     ASSERT_EQ (((TASE2Server*)handle)->m_outstandingCommands.size (), 0);
+
+    Tase2_Client_destroy (client);
+}
+
+TEST_F (ControlTest, SimpleCommandNotInExchange)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+
+    Tase2_ClientError err
+        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+    Tase2_Client_sendCommand (client, &err, "icc1", "commandNotInExchange", 1);
+
+    ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
+
+    ASSERT_EQ (operateHandlerCalled, 0);
 
     Tase2_Client_destroy (client);
 }

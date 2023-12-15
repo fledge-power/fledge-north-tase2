@@ -163,6 +163,11 @@ static const char* default_config = QUOTE ({
                             "name" : "datapointStateSupQTimeExt",
                             "type" : "StateSupQTimeExt",
                             "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointNotInExchange",
+                            "type" : "StateSupQTimeExt",
+                            "hasCOV" : false
                         }
                     ]
                 },
@@ -258,6 +263,11 @@ static const char* default_config = QUOTE ({
                             "name" : "datapointStateSupQTimeExt",
                             "type" : "StateSupQTimeExt",
                             "hasCOV" : false
+                        },
+                        {
+                            "name" : "datapointNotInExchange",
+                            "type" : "StateSupQTimeExt",
+                            "hasCOV" : false
                         }
                     ]
                 } ],
@@ -295,7 +305,8 @@ static const char* default_config = QUOTE ({
                             { "name" : "datapointStateSup" },
                             { "name" : "datapointStateSupQ" },
                             { "name" : "datapointStateSupQTime" },
-                            { "name" : "datapointStateSupQTimeExt" }
+                            { "name" : "datapointStateSupQTimeExt" },
+                            { "name" : "datapointNotInExchange" }
                         ]
                     }
                 ]
@@ -592,6 +603,65 @@ class SendSpontDataTest : public testing::Test
         return new Datapoint (dataname, dp_value);
     }
 
+    static Datapoint*
+    createFakeDataObject (const char* type, const char* domain,
+                          const char* name, const char* iv, const char* cs,
+                          const char* nv, uint64_t ts, const char* tsv)
+    {
+        auto* datapoints = new vector<Datapoint*>;
+
+        datapoints->push_back (createDatapoint ("do_type", type));
+        datapoints->push_back (createDatapoint ("do_domain", domain));
+        datapoints->push_back (createDatapoint ("do_name", name));
+
+        DPTYPE dpType = TASE2Datapoint::getDpTypeFromString (type);
+
+        switch (dpType)
+        {
+        case DISCRETE:
+        case DISCRETEQ:
+        case DISCRETEQTIME:
+        case DISCRETEQTIMEEXT:
+        case STATESUP:
+        case STATESUPQ:
+        case STATESUPQTIME:
+        case STATESUPQTIMEEXT:
+        case STATE:
+        case STATEQ:
+        case STATEQTIME:
+        case STATEQTIMEEXT: {
+            datapoints->push_back (createDatapoint ("do_value", "wrong"));
+            break;
+        }
+        case REAL:
+        case REALQ:
+        case REALQTIME:
+        case REALQTIMEEXT: {
+            datapoints->push_back (createDatapoint ("do_value", "wrong"));
+            break;
+        }
+        default: {
+            break;
+        }
+        }
+
+        datapoints->push_back (createDatapoint ("do_validity", iv));
+        datapoints->push_back (createDatapoint ("do_cs", cs));
+        datapoints->push_back (
+            createDatapoint ("do_quality_normal_value", nv));
+        if (ts)
+        {
+            datapoints->push_back (createDatapoint ("do_ts", (long)ts));
+            datapoints->push_back (createDatapoint ("do_ts_validity", tsv));
+        }
+
+        DatapointValue dpv (datapoints, true);
+
+        Datapoint* dp = new Datapoint ("data_object", dpv);
+
+        return dp;
+    }
+
     template <class T>
     static Datapoint*
     createDataObject (const char* type, const char* domain, const char* name,
@@ -668,19 +738,39 @@ class SendSpontDataTest : public testing::Test
         Tase2_Client_setTcpPort (client, TCP_TEST_PORT);
     }
 
+    void
+    executeTestWrongDataType (Tase2_Client& client, PLUGIN_HANDLE& handle,
+                              const char* type, const char* name,
+                              const char* label, std::string expectedValue)
+    {
+        auto* dataobjects = new vector<Datapoint*>;
+        dataobjects->push_back (
+            createFakeDataObject (type, "icc1", name, "valid", "telemetered",
+                                  "normal", (uint64_t)123456, "valid"));
+        auto* reading = new Reading (std::string (label), *dataobjects);
+        vector<Reading*> readings;
+        readings.push_back (reading);
+        plugin_send (handle, readings);
+        delete dataobjects;
+        delete reading;
+        readings.clear ();
+    }
+
     template <class T>
     void
     executeTest (Tase2_Client& client, PLUGIN_HANDLE& handle, const char* type,
-                 const char* name, const char* label, T expectedValue)
+                 const char* name, const char* label, const char* validity,
+                 const char* cs, const char* nv, T expectedValue,
+                 bool expectedSuccess)
     {
         Tase2_ClientError err
             = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
         ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
 
         auto* dataobjects = new vector<Datapoint*>;
-        dataobjects->push_back (createDataObject (
-            type, "icc1", name, expectedValue, "valid", "telemetered",
-            "normal", (uint64_t)123456, "valid"));
+        dataobjects->push_back (
+            createDataObject (type, "icc1", name, expectedValue, validity, cs,
+                              nv, (uint64_t)123456, "valid"));
         auto* reading = new Reading (std::string (label), *dataobjects);
         vector<Reading*> readings;
         readings.push_back (reading);
@@ -692,7 +782,7 @@ class SendSpontDataTest : public testing::Test
 
         Tase2_PointValue pv
             = Tase2_Client_readPointValue (client, &err, "icc1", name);
-        ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+        ASSERT_EQ (err, TASE2_CLIENT_ERROR_OK);
 
         Tase2_DataFlags flags = TASE2_DATA_FLAGS_VALIDITY_VALID
                                 | TASE2_DATA_FLAGS_CURRENT_SOURCE_TELEMETERED
@@ -733,7 +823,14 @@ class SendSpontDataTest : public testing::Test
         case STATESUPQTIMEEXT: {
             Tase2_DataStateSupplemental stateSup
                 = Tase2_PointValue_getValueStateSupplemental (pv);
-            ASSERT_EQ (stateSup, (int)expectedValue);
+            if (expectedSuccess)
+            {
+                ASSERT_EQ (stateSup, (int)expectedValue);
+            }
+            else
+            {
+                ASSERT_NE (stateSup, (int)expectedValue);
+            }
             break;
         }
         default: {
@@ -741,18 +838,20 @@ class SendSpontDataTest : public testing::Test
         }
         }
 
-        Tase2_TimeStampClass tsClass
-            = TASE2Datapoint::getTimeStampClass (dpType);
-
-        if (tsClass == TASE2_TIMESTAMP_EXTENDED)
+        if (expectedSuccess)
         {
-            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123456);
-        }
-        else if (tsClass == TASE2_TIMESTAMP)
-        {
-            ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123000);
-        }
+            Tase2_TimeStampClass tsClass
+                = TASE2Datapoint::getTimeStampClass (dpType);
 
+            if (tsClass == TASE2_TIMESTAMP_EXTENDED)
+            {
+                ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123456);
+            }
+            else if (tsClass == TASE2_TIMESTAMP)
+            {
+                ASSERT_EQ (Tase2_PointValue_getTimeStamp (pv), 123000);
+            }
+        }
         if (pv)
         {
             Tase2_PointValue_destroy (pv);
@@ -768,7 +867,8 @@ TEST_F (SendSpontDataTest, SendRealData)
 
     setupTest (config, handle, client);
     executeTest<float> (client, handle, "Real", "datapointReal",
-                        "RealTestLabel", 123.45f);
+                        "RealTestLabel", "valid", "telemetered", "normal",
+                        123.45f, true);
 }
 
 TEST_F (SendSpontDataTest, SendRealQData)
@@ -778,7 +878,8 @@ TEST_F (SendSpontDataTest, SendRealQData)
 
     setupTest (config, handle, client);
     executeTest<float> (client, handle, "RealQ", "datapointRealQ",
-                        "RealQTestLabel", 234.56f);
+                        "RealQTestLabel", "held", "entered", "normal", 234.56f,
+                        true);
 }
 
 TEST_F (SendSpontDataTest, SendRealQTimeData)
@@ -788,7 +889,8 @@ TEST_F (SendSpontDataTest, SendRealQTimeData)
 
     setupTest (config, handle, client);
     executeTest<float> (client, handle, "RealQTime", "datapointRealQTime",
-                        "RealQTimeTestLabel", 345.67f);
+                        "RealQTimeTestLabel", "suspect", "calculated",
+                        "normal", 345.67f, true);
 }
 
 TEST_F (SendSpontDataTest, SendRealQTimeExtData)
@@ -799,7 +901,7 @@ TEST_F (SendSpontDataTest, SendRealQTimeExtData)
     setupTest (config, handle, client);
     executeTest<float> (client, handle, "RealQTimeExt",
                         "datapointRealQTimeExt", "RealQTimeExtTestLabel",
-                        456.78f);
+                        "invalid", "estimated", "normal", 456.78f, true);
 }
 
 TEST_F (SendSpontDataTest, SendStateData)
@@ -809,7 +911,8 @@ TEST_F (SendSpontDataTest, SendStateData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "State", "datapointState",
-                      "StateTestLabel", 1);
+                      "StateTestLabel", "valid", "telemetered", "normal", 1,
+                      true);
 }
 
 TEST_F (SendSpontDataTest, SendStateQData)
@@ -819,7 +922,8 @@ TEST_F (SendSpontDataTest, SendStateQData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "StateQ", "datapointStateQ",
-                      "StateQTestLabel", 2);
+                      "StateQTestLabel", "valid", "telemetered", "normal", 2,
+                      true);
 }
 
 TEST_F (SendSpontDataTest, SendStateQTimeData)
@@ -829,7 +933,8 @@ TEST_F (SendSpontDataTest, SendStateQTimeData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "StateQTime", "datapointStateQTime",
-                      "StateQTimeTestLabel", 3);
+                      "StateQTimeTestLabel", "valid", "telemetered", "normal",
+                      3, true);
 }
 
 TEST_F (SendSpontDataTest, SendStateQTimeExtData)
@@ -839,7 +944,8 @@ TEST_F (SendSpontDataTest, SendStateQTimeExtData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "StateQTimeExt",
-                      "datapointStateQTimeExt", "StateQTimeExtTestLabel", 4);
+                      "datapointStateQTimeExt", "StateQTimeExtTestLabel",
+                      "valid", "telemetered", "normal", 4, true);
 }
 
 TEST_F (SendSpontDataTest, SendDiscreteData)
@@ -849,7 +955,8 @@ TEST_F (SendSpontDataTest, SendDiscreteData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "Discrete", "datapointDiscrete",
-                      "DiscreteTestLabel", 5);
+                      "DiscreteTestLabel", "valid", "telemetered", "normal", 5,
+                      true);
 }
 
 TEST_F (SendSpontDataTest, SendDiscreteQData)
@@ -859,7 +966,8 @@ TEST_F (SendSpontDataTest, SendDiscreteQData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "DiscreteQ", "datapointDiscreteQ",
-                      "DiscreteQTestLabel", 6);
+                      "DiscreteQTestLabel", "valid", "telemetered", "normal",
+                      6, true);
 }
 
 TEST_F (SendSpontDataTest, SendDiscreteQTimeData)
@@ -869,7 +977,8 @@ TEST_F (SendSpontDataTest, SendDiscreteQTimeData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "DiscreteQTime",
-                      "datapointDiscreteQTime", "DiscreteQTimeTestLabel", 7);
+                      "datapointDiscreteQTime", "DiscreteQTimeTestLabel",
+                      "valid", "telemetered", "normal", 7, true);
 }
 
 TEST_F (SendSpontDataTest, SendDiscreteQTimeExtData)
@@ -880,7 +989,7 @@ TEST_F (SendSpontDataTest, SendDiscreteQTimeExtData)
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "DiscreteQTimeExt",
                       "datapointDiscreteQTimeExt", "DiscreteQTimeExtTestLabel",
-                      8);
+                      "valid", "telemetered", "normal", 8, true);
 }
 
 TEST_F (SendSpontDataTest, SendStateSupData)
@@ -890,7 +999,8 @@ TEST_F (SendSpontDataTest, SendStateSupData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "StateSup", "datapointStateSup",
-                      "StateSupTestLabel", 9);
+                      "StateSupTestLabel", "valid", "telemetered", "normal", 9,
+                      true);
 }
 
 TEST_F (SendSpontDataTest, SendStateSupQData)
@@ -900,7 +1010,8 @@ TEST_F (SendSpontDataTest, SendStateSupQData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "StateSupQ", "datapointStateSupQ",
-                      "StateSupQTestLabel", 10);
+                      "StateSupQTestLabel", "valid", "telemetered", "normal",
+                      10, true);
 }
 
 TEST_F (SendSpontDataTest, SendStateSupQTimeData)
@@ -910,7 +1021,8 @@ TEST_F (SendSpontDataTest, SendStateSupQTimeData)
 
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "StateSupQTime",
-                      "datapointStateSupQTime", "StateSupQTimeTestLabel", 11);
+                      "datapointStateSupQTime", "StateSupQTimeTestLabel",
+                      "valid", "telemetered", "normal", 11, true);
 }
 
 TEST_F (SendSpontDataTest, SendStateSupQTimeExtData)
@@ -921,5 +1033,55 @@ TEST_F (SendSpontDataTest, SendStateSupQTimeExtData)
     setupTest (config, handle, client);
     executeTest<int> (client, handle, "StateSupQTimeExt",
                       "datapointStateSupQTimeExt", "StateSupQTimeExtTestLabel",
-                      12);
+                      "valid", "telemetered", "normal", 12, true);
+}
+
+TEST_F (SendSpontDataTest, InvalidDataTypes)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    std::vector<std::pair<std::string, std::string> > nameTypePairs
+        = { { "datapointReal", "Real" },
+            { "datapointRealQ", "RealQ" },
+            { "datapointRealQTime", "RealQTime" },
+            { "datapointRealQTimeExt", "RealQTimeExt" },
+            { "datapointState", "State" },
+            { "datapointStateQ", "StateQ" },
+            { "datapointStateQTime", "StateQTime" },
+            { "datapointStateQTimeExt", "StateQTimeExt" },
+            { "datapointDiscrete", "Discrete" },
+            { "datapointDiscreteQ", "DiscreteQ" },
+            { "datapointDiscreteQTime", "DiscreteQTime" },
+            { "datapointDiscreteQTimeExt", "DiscreteQTimeExt" },
+            { "datapointStateSup", "StateSup" },
+            { "datapointStateSupQ", "StateSupQ" },
+            { "datapointStateSupQTime", "StateSupQTime" },
+            { "datapointStateSupQTimeExt", "StateSupQTimeExt" } };
+
+    setupTest (config, handle, client);
+
+    Tase2_ClientError err
+        = Tase2_Client_connect (client, "127.0.0.1", "1.1.1.999", 12);
+    ASSERT_TRUE (err == TASE2_CLIENT_ERROR_OK);
+
+    for (auto pair : nameTypePairs)
+    {
+        executeTestWrongDataType (client, handle, pair.second.c_str (),
+                                  pair.first.c_str (), "",
+                                  (std::string) "wrong");
+    }
+
+    Tase2_Client_destroy (client);
+}
+
+TEST_F (SendSpontDataTest, SendDataNotInExchange)
+{
+    ConfigCategory config;
+    Tase2_Client client;
+
+    setupTest (config, handle, client);
+    executeTest<int> (client, handle, "StateSupQTimeExt",
+                      "datapointNotInExchange", "Ex", "valid", "telemetered",
+                      "normal", 12, false);
 }
