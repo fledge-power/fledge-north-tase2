@@ -838,10 +838,13 @@ TASE2Config::importExchangeConfig (const std::string& exchangeConfig,
                 auto itDP = domain.find (dpRef);
                 if (itDP == domain.end ())
                 {
-                    Tase2Utility::log_warn ("Invalid Datapoint ref %s",
-                                            dpRef.c_str ());
+                    Tase2Utility::log_warn ("Invalid Datapoint ref %s:%s",
+                                            domainRef.c_str(), dpRef.c_str ());
                     continue;
                 }
+
+                Tase2Utility::log_debug ("Add dp to Exchange Def %s %s",
+                                            domainRef.c_str (), dpRef.c_str());
 
                 itDP->second->setInExchangedDefinitions (true);
             }

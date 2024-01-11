@@ -105,6 +105,10 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
     Tase2_Endpoint_setLocalApTitle (m_endpoint, m_config->localAP ().c_str (),
                                     m_config->localAE ());
 
+    if(m_passive){
+        Tase2_Endpoint_setLocalTcpPort (m_endpoint, m_config->TcpPort());                                
+    }
+    
     m_server = Tase2_Server_createEx (m_model, m_endpoint);
 
     for (const auto& blt : m_config->getBilateralTables ())

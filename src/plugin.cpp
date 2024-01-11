@@ -169,6 +169,13 @@ extern "C"
                                 "name" : "datapointStateSupQTimeExt",
                                 "type" : "StateSupQTimeExt",
                                 "hasCOV" : false
+                            },
+                            {
+                                "name" : "command1",
+                                "type" : "Command",
+                                "mode" : "direct",
+                                "hasTag" : false,
+                                "checkBackId" : 123
                             }
                         ]
                     },
@@ -264,6 +271,13 @@ extern "C"
                                 "name" : "datapointStateSupQTimeExt",
                                 "type" : "StateSupQTimeExt",
                                 "hasCOV" : false
+                            },
+                            {
+                                "name" : "command1",
+                                "type" : "Command",
+                                "mode" : "direct",
+                                "hasTag" : false,
+                                "checkBackId" : 123
                             }
                         ]
                     } ],
@@ -301,7 +315,8 @@ extern "C"
                                 { "name" : "datapointStateSup" },
                                 { "name" : "datapointStateSupQ" },
                                 { "name" : "datapointStateSupQTime" },
-                                { "name" : "datapointStateSupQTimeExt" }
+                                { "name" : "datapointStateSupQTimeExt" },
+                                { "name" : "command1" }
                             ]
                         }
                     ],
@@ -466,6 +481,13 @@ extern "C"
                                 "name" : "tase2",
                                 "ref" : "icc1:datapointStateSupQTimeExt"
                             } ]
+                        },
+                        {
+                            "pivot_id" : "TC1",
+                            "label" : "TC1",
+                            "protocols" : [
+                                { "name" : "tase2", "ref" : "icc1:command1" }
+                            ]
                         }
                     ]
                 }
