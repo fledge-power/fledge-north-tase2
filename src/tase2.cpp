@@ -36,9 +36,36 @@ GetCurrentTimeInMs ()
     return ((uint64_t)now.tv_sec * 1000LL) + (now.tv_usec / 1000);
 }
 
+static void
+tase2LogHandler(Tase2_LogLevel logLevel, Tase2_LogSource source, Tase2_Endpoint endpoint, Tase2_Endpoint_Connection peer, const char* message)
+{
+    switch(logLevel)
+    {
+        case TASE2_LOG_DEBUG:
+            Tase2Utility::log_debug("[TASE.2] %s", message);
+            break;
+
+        case TASE2_LOG_INFO:
+            Tase2Utility::log_info("[TASE.2] %s", message);
+            break;
+
+        case TASE2_LOG_WARNING:
+            Tase2Utility::log_warn("[TASE.2] %s", message);
+            break;
+
+        case TASE2_LOG_ERROR:
+            Tase2Utility::log_error("[TASE.2] %s", message);
+            break;
+
+        default:
+            break;
+    }
+}
+
 TASE2Server::TASE2Server () : m_started (false), m_config (new TASE2Config ())
 {
-    Logger::getLogger ()->setMinLevel ("debug");
+    Tase2_Library_setLogLevel(TASE2_LOG_DEBUG);
+    Tase2_Library_setLogFunctionEx(tase2LogHandler);
 }
 
 TASE2Server::~TASE2Server ()
@@ -92,6 +119,8 @@ TASE2Server::setJsonConfig (const std::string& stackConfig,
 
     m_endpoint = Tase2_Endpoint_create (m_tlsConfig, m_passive);
 
+    Tase2Utility::log_info("%s endpoint created", m_passive ? "Passive" : "Active");
+
     if (!m_passive)
     {
         Tase2_Endpoint_setRemoteIpAddress (m_endpoint,
@@ -129,6 +158,7 @@ void
 TASE2Server::start ()
 {
     m_started = true;
+
     m_connectionThread
         = new std::thread (&TASE2Server::_connectionThread, this);
     m_monitoringThread
@@ -419,7 +449,7 @@ TASE2Server::forwardCommand (const std::string& scope,
     char* s_type = (char*)type.c_str ();
     char* s_domain = (char*)domain.c_str ();
     char* s_name = (char*)name.c_str ();
-    char* s_val = "";
+    char* s_val = (char*)"";
     char* s_select = (char*)(select ? "1" : "0");
     char* s_ts = (char*)tsStr.c_str ();
 
