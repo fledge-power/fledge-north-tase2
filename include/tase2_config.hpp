@@ -6,6 +6,7 @@
 #include "rapidjson/error/en.h"
 #include "tase2_datapoint.hpp"
 
+#include <gtest/gtest.h>
 #include <algorithm>
 #include <regex>
 #include <sstream>
@@ -118,6 +119,7 @@ class TASE2Config
     }
 
   private:
+    static bool isValidTase2Reference (const std::string& ref);
     static bool isValidIPAddress (const std::string& addrStr);
 
     std::string m_remoteAP = "";
@@ -149,6 +151,7 @@ class TASE2Config
     std::string m_ownCertificate;
     std::vector<std::string> m_remoteCertificates;
     std::vector<std::string> m_caCertificates;
+    FRIEND_TEST (DatasetTest, ValidReference);
 };
 
 #endif

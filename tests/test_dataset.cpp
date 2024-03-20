@@ -902,3 +902,17 @@ TEST_F (DatasetTest, ActivateDataTransferSet)
 
     Tase2_Client_destroy (client);
 }
+
+TEST_F(DatasetTest, ValidReference){
+    ConfigCategory config;
+    Tase2_Client client;
+    setupTest (config, handle, client);
+    ASSERT_TRUE(TASE2Config::isValidTase2Reference("datapoint1"));
+    ASSERT_FALSE(TASE2Config::isValidTase2Reference("datapoint1+datapoint2"));
+    ASSERT_FALSE(TASE2Config::isValidTase2Reference("datapoint.1"));
+    ASSERT_TRUE(TASE2Config::isValidTase2Reference("datapoint_1"));
+    if(client){
+        Tase2_Client_disconnect(client);
+        Tase2_Client_destroy(client);     
+    }
+}

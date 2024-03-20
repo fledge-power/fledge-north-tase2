@@ -605,6 +605,7 @@ TEST_F (ControlTest, SimpleCommandSBO)
     ASSERT_EQ (strcmp (receivedParameters[5], "0"), 0);
     ASSERT_NE (strcmp (receivedParameters[6], ""), 0);
 
+    Tase2_Client_disconnect(client);
     Tase2_Client_destroy (client);
 }
 

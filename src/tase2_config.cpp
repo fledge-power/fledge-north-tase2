@@ -19,6 +19,14 @@ using namespace rapidjson;
 #define JSON_PROT_REF "ref"
 #define JSON_PROT_CDC "cdc"
 
+
+bool TASE2Config::isValidTase2Reference(const std::string& ref)
+{
+    std::regex pattern("[^A-Za-z$_0-9]");
+
+    return !std::regex_search(ref, pattern);
+}
+
 TASE2Config::TASE2Config () = default;
 
 TASE2Config::~TASE2Config () = default;
@@ -99,6 +107,13 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
         {
             Tase2Utility::log_error ("DATAPOINT HAS NO TYPE");
             return;
+        }
+        
+        if(!isValidTase2Reference(datapoint["name"].GetString()))
+        {
+            Tase2Utility::log_error ("Invalid TASE2 reference %s, reference must only contain letters, numbers, $ or _",
+                                     datapoint["name"].GetString ());
+            continue;
         }
 
         DPTYPE type = TASE2Datapoint::getDpTypeFromString (
@@ -232,6 +247,13 @@ TASE2Config::importModelConfig (const std::string& modelConfig,
             {
                 Tase2Utility::log_error ("DATAPOINT HAS NO TYPE");
                 return;
+            }
+
+            if(!isValidTase2Reference(datapoint["name"].GetString()))
+            {
+                Tase2Utility::log_error ("Invalid TASE2 reference %s, reference must only contain letters, numbers, $ or _",
+                                        datapoint["name"].GetString ());
+                continue;
             }
 
             DPTYPE type = TASE2Datapoint::getDpTypeFromString (
